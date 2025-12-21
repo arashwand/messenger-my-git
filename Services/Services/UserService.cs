@@ -253,12 +253,28 @@ namespace Messenger.Services.Services
         }
 
 
-        public async Task<IEnumerable<UserDto>> SearchUsersAsync(string query)
+        public async Task<IEnumerable<UserDto>> SearchUsersAsync(string query, string searchType = "name")
         {
-            _logger.LogInformation("Searching users with query: {Query}", query);
-            var userEntities = await _context.Users
-                .Where(u => u.NameFamily.Contains(query) || u.DeptName.Contains(query))
-                .ToListAsync();
+            _logger.LogInformation("Searching users: query={Query}, type={SearchType}", query, searchType);
+            
+            IQueryable<User> usersQuery = _context.Users;
+
+            // جستجو بر اساس نوع
+            if (searchType == "nationalCode")
+            {
+                // فرض: کد ملی در فیلد LoginCode ذخیره شده
+                usersQuery = usersQuery.Where(u => u.LoginCode.Contains(query));
+            }
+            else
+            {
+                // جستجو بر اساس نام (پیشفرض)
+                usersQuery = usersQuery.Where(u => 
+                    u.NameFamily.Contains(query) || 
+                    u.DeptName.Contains(query)
+                );
+            }
+
+            var userEntities = await usersQuery.ToListAsync();
 
             return userEntities.Select(s => new UserDto
             {

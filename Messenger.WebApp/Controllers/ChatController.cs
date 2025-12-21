@@ -175,21 +175,40 @@ namespace Messenger.WebApp.Controllers
 
         [HttpGet("searchUsers")]
         [Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
-        public async Task<IActionResult> SearchUsers([FromQuery] string query)
+        public async Task<IActionResult> SearchUsers([FromQuery] string query, [FromQuery] string searchType = "name")
         {
             try
             {
                 // Validate input
-                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                if (string.IsNullOrWhiteSpace(query))
                 {
-                    return BadRequest(new { success = false, message = "Search query must be at least 2 characters." });
+                    return BadRequest(new { success = false, message = "متن جستجو نمیتواند خالی باشد." });
+                }
+
+                if (query.Length < 2)
+                {
+                    return BadRequest(new { success = false, message = "حداقل ۲ کاراکتر برای جستجو لازم است." });
+                }
+
+                // Validate searchType
+                if (searchType != "name" && searchType != "nationalCode")
+                {
+                    searchType = "name";
                 }
 
                 var currentUserId = GetCurrentUserId();
-                _logger.LogInformation("User {UserId} searching for users with query: {Query}", currentUserId, query);
+                var currentUserRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+
+                _logger.LogInformation(
+                    "User {UserId} with role {Role} searching for users with query: {Query}, type: {SearchType}",
+                    currentUserId,
+                    currentUserRole,
+                    query,
+                    searchType
+                );
 
                 // Call the API to search users
-                var users = await _userService.SearchUsersAsync(query);
+                var users = await _userService.SearchUsersAsync(query, searchType);
 
                 // Filter out the current user from results
                 var filteredUsers = users.Where(u => u.UserId != currentUserId).ToList();
@@ -200,7 +219,8 @@ namespace Messenger.WebApp.Controllers
                 {
                     success = true,
                     data = filteredUsers,
-                    count = filteredUsers.Count
+                    count = filteredUsers.Count,
+                    searchType = searchType
                 });
             }
             catch (HttpRequestException ex)

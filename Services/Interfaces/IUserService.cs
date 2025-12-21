@@ -8,7 +8,7 @@ namespace Messenger.Services.Interfaces
     public interface IUserService
     {
         Task<UserDto?> GetUserByIdAsync(long userId, ClaimsPrincipal userClaims = null, bool useInternalService = false);
-        Task<IEnumerable<UserDto>> SearchUsersAsync(string query); // Basic search by name/dept etc.
+        Task<IEnumerable<UserDto>> SearchUsersAsync(string query, string searchType = "name");
 
         // Blocking Users
         Task BlockUserAsync(long blockerUserId, long blockedUserId, string? comment = null);
