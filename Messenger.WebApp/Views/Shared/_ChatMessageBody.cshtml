@@ -1,0 +1,664 @@
+@using System.Security.Claims
+@using Messenger.DTOs
+@using Messenger.Tools
+@using Newtonsoft.Json
+@model IEnumerable<MessageDto>
+
+
+@{
+    long selfUserId = long.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+    int chatGroupId = 0;
+    if (ViewData["chatGroupId"] != null)
+    {
+        if (ViewData["chatGroupId"] is int intValue)
+        {
+            chatGroupId = intValue;
+        }
+        else if (int.TryParse(ViewData["chatGroupId"].ToString(), out int groupId))
+        {
+            chatGroupId = groupId;
+        }
+    }
+    string[] AllowedImages = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"];
+    if (ViewData.ContainsKey("allowedImagesExtention"))
+    {
+        AllowedImages = ViewData["allowedImagesExtention"] as string[] ?? AllowedImages;
+    }
+    var _baseUrl = ViewData["baseUrl"]?.ToString() ?? "";
+    var chatType = ViewData["chatType"]?.ToString() ?? "ClassGroup";
+
+    var pinnedMessageIdGenerated = "pinnedMessage_" + chatGroupId + "_" + chatType;
+
+    var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
+    var pinnedMessages = Model.Where(m => m.IsPin).OrderBy(m => m.PinnedAt);
+}
+
+<style>
+    .pinned-messages-container::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pinned-messages-container {
+        background: rgba(255,255,255,0.9);
+        margin-top: 5px;
+        // border: 1px solid #e0e0e0;
+        padding: 2px;
+        border-radius: 5px;
+        max-height: 30px;
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .pinned-messages-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pinned-message-item {
+        padding: 4px 12px;
+        border-bottom: 1px solid #f0f0f0;
+        display: block;
+    }
+
+        .pinned-message-item:last-child {
+            border-bottom: none;
+        }
+
+    .borderPinMessage {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 60%;
+        background-color: #28a745;
+        border-radius: 2px;
+    }
+
+    .pinMessageText {
+        font-size: 14px;
+        color: #333;
+        line-height: 1.4;
+    }
+
+    .svg-arrow-down{
+        background-color: rgba(0, 0, 0, 0.125);
+        border-radius: 50%;
+        padding: 6px 2px 7px 5px;
+        margin: 3px;
+    }
+
+   
+</style>
+
+<input type="hidden" id="current-group-id-hidden-input" value="@chatGroupId" />
+<input type="hidden" id="current-group-type-hidden-input" value="@chatType" />
+<input type="hidden" id="userRoleName" value="@roleName" />
+
+<!-- header starts -->
+<header id="header-chat" class="section-t-space main-header inner-page-header" style="padding-top:15px;">
+    <div class="custom-container">
+        <div class="header-panel contact-panel" style="padding-bottom:5px;">
+            <div class="d-flex align-items-center gap-2">
+                <a href="#" id="close-chat-panel-btn">
+                    <i class="iconsax icon-btn" data-icon="chevron-left"> </i>
+                </a>
+                <div class="profile-head">
+                    <div class="profile-img">
+                        @* <img src="/chatzy/assets/iconsax/group.svg" alt="group" />*@
+                    </div>
+                    <div>
+                        <h4 class="fw-semibold groupName"></h4>
+                        <small class="text-muted" id="typing-indicator-@chatGroupId"></small>
+                        <div id="@pinnedMessageIdGenerated" class="pinnedMessagesPlaceholder" data-chat-id="@chatGroupId" data-chat-type="@chatType"></div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-sm-3 gap-2">
+                <div class="dropdown more-options dropdown-menu-end">
+                    <a class="btn dropdown-toggle mt-0 p-0" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="iconsax icon-btn" data-icon="menu-meatballs"> </i>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@chatGroupId', '@chatType')">
+                                <img src="/chatzy/assets/iconsax/group.svg" alt="group" />
+
+                                &nbsp;
+                                <span>اعضای گروه</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+<!-- header end -->
+<!-- group chat section starts -->
+<section class="section-lg-b-space position-relative pt-0" id="chat_content">
+    <img class="img-fluid chat-bg" src="" alt="wallpaper">
+    <div class="custom-container">
+
+        <div id="newMessagesNotice" class="sticky-top mt-4 p-1 btn btn-success" style="display:none; cursor:pointer; z-index: 10; padding-bottom: 5px !important; margin-bottom: 5px;" data-newCount="0">
+            مشاهده پیام‌های جدید
+           
+        </div>
+        
+
+        <input type="hidden" id="lastMessageIdLoad" value="@(Model.Count() > 0 ? Model.First().MessageId : 0)" />
+        @* <input type="hidden" id="hasMoreMessages" value="@true" />*@
+        <input type="hidden" id="lastReadMessageId" value="@(ViewData["LastReadMessageId"] ?? 0)" />
+
+        <div id="Message_Days">
+            @{
+
+                var today = DateTime.Today;
+                var yesterday = today.AddDays(-1);
+                bool createdTodayBodyMessage = false;
+
+                var groupedMessages = Model.OrderBy(m => m.MessageDateTime).GroupBy(m => m.MessageDateTime.Date);
+            }
+
+            @foreach (var group in groupedMessages)
+            {
+                string dateLabel;
+                string todayMessageContent = "";
+                string dateClass = "date-" + @group.Key.ToString("yyyy-MM-dd");
+                if (group.Key == today)
+                {
+                    dateLabel = "امروز";
+                    todayMessageContent = "chatMessages";
+                    createdTodayBodyMessage = true;
+                }
+                else if (group.Key == yesterday)
+                {
+                    dateLabel = "دیروز";
+                }
+                else
+                {
+                    dateLabel = group.Key.ToString("dddd، d MMMM yyyy", new System.Globalization.CultureInfo("fa-IR"));
+                }
+
+
+                var chatInDateLabel = @group.Key.ToString("yyyy-MM-dd");
+                <h6 class="fw-normal text-center heading chatInDateLabelClass" data-label="@dateLabel" id="@dateClass">@dateLabel</h6>
+                <ul class="message-box-list" id="chatMessages-@chatInDateLabel">
+
+                    @foreach (var message in group)
+                    {
+                        bool isSelf = message.SenderUserId == selfUserId;
+                        bool IsSystemMessage = message.IsSystemMessage;
+                        bool hasRecorderFile = message.MessageFiles?.Any(f => f.FileExtension.Extension == ".webm") ?? false;
+                        bool isRead = message.IsReadByCurrentUser;
+                        if (isSelf)
+                        {
+                            isRead = true;
+                        }
+
+                        if (IsSystemMessage)
+                        {
+                            isSelf = false;
+                            message.SenderUser.NameFamily = "systembot";
+                        }
+
+                        object messageDetailsForEdit = new
+                        {
+                            messageText = message.MessageText?.MessageTxt,
+                            replyToMessageId = message.ReplyMessageId,
+                            // فقط در صورتی که پاسخ وجود دارد، اطلاعات آن را اضافه کن
+                            replyMessage = message.ReplyMessageId != null ? new
+                            {
+                                senderUserName = message.ReplyMessage?.SenderUser?.NameFamily,
+                                messageText = message.ReplyMessage?.MessageText?.MessageTxt
+                            } : null,
+                            // اطلاعات فایل‌ها را به صورت یک لیست از آبجکت‌ها اضافه کن
+                            messageFiles = message.MessageFiles?.Select(f => new
+                            {
+                                messageFileId = f.MessageFileId, // شناسه فایل در دیتابیس
+                                fileName = f.FileName,
+                                fileThumbPath = f.FileThumbPath,
+                                originalFileName = f.OriginalFileName,
+                                FileSizeConverter = f.FileSize
+                            })
+                        };
+                        var messageDetailsJson = JsonConvert.SerializeObject(messageDetailsForEdit);
+
+                        <li class="message @(isSelf ? "personal" : "new") @(IsSystemMessage ? "systemMessage" : "")" id="message-@message.MessageId"
+                            data-message-id="@message.MessageId"
+                            data-sender-id="@message.SenderUserId"
+                            data-sender-username="@message.SenderUser.NameFamily"
+                            data-is-read="@isRead.ToString().ToLower()"
+                            data-message-details='@Html.Raw(messageDetailsJson)'>
+
+                            <!--message option menu-->
+
+                            <div class="dropdown message-options">
+                                <a class="btn" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <img src="~/chatzy/assets/iconsax/menu-meatballs.svg" alt="menu" />
+                                </a>
+                                <div class="dropdown-menu">
+                                    @if (IsSystemMessage)
+                                    {
+                                        <a class="dropdown-item d-flex align-items-center actionSaveMessage" data-messageid="@message.MessageId" href="#">
+                                            <img src="~/chatzy/assets/iconsax/save-2.svg" class="svgInvertColor" />&nbsp;
+                                            <span>ذخیره</span>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        @if (isSelf)
+                                        {
+                                            // اگر فایل ضبظ شده نبود میتونه ویرایش کنه
+                                            if (!@hasRecorderFile)
+                                            {
+                                                <a class="dropdown-item d-flex align-items-center actionEditMessage" data-messageid="@message.MessageId" href="#">
+                                                    <img src="~/chatzy/assets/iconsax/edit.svg" alt="ویرایش" class="svgInvertColor" />&nbsp;
+                                                    <span>ویرایش</span>
+                                                </a>
+                                            }
+
+
+                                            <a class="dropdown-item d-flex align-items-center actionDeleteMessage" data-messageid="@message.MessageId" href="#">
+                                                <img src="~/chatzy/assets/iconsax/trash.svg" />&nbsp;
+                                                <span>حذف</span>
+                                            </a>
+                                        }
+                                        <a class="dropdown-item d-flex align-items-center actionReplyMessage" data-messageid="@message.MessageId" href="#">
+                                            <img src="~/chatzy/assets/iconsax/redo-arrow.svg" class="svgInvertColor" />&nbsp;
+                                            <span>پاسخ دادن</span>
+                                        </a>
+                                        <a class="dropdown-item d-flex align-items-center actionSaveMessage" data-messageid="@message.MessageId" href="#">
+                                            <img src="~/chatzy/assets/iconsax/save-2.svg" class="svgInvertColor" />&nbsp;
+                                            <span>ذخیره</span>
+                                        </a>
+
+                                        if (User.IsInRole(ConstRoles.Teacher) || User.IsInRole(ConstRoles.Personel) || User.IsInRole(ConstRoles.Manager))
+                                        {
+                                            <a class="dropdown-item d-flex align-items-center actionPinMessage" data-messageid="@message.MessageId" data-is-pinned="@(message.IsPin ? "true" : "false")" href="#" aria-label="Pin message">
+
+                                                @if (message.IsPin)
+                                                {
+                                                    <img src="~/chatzy/assets/iconsax/pin-slash.svg" />
+                                                    <span>&nbsp;</span>
+                                                    <span class="pin-text">لغو سنجاق</span>
+                                                }
+                                                else
+                                                {
+                                                    <img src="~/chatzy/assets/iconsax/pin-1.svg" />
+                                                    <span>&nbsp;</span>
+                                                    <span class="pin-text">سنجاق</span>
+                                                }
+
+                                            </a>
+                                        }
+
+                                        @if (message.MessageFiles != null)
+                                        {
+                                            if (message.MessageFiles.Any(a => a.FileExtension.Extension == ".webm"))
+                                            {
+                                                var file = message.MessageFiles.First(a => a.FileExtension.Extension == ".webm");
+                                                <a class="dropdown-item d-flex align-items-center btn-download-file" data-file-id="@file.MessageFileId" data-messageid="@message.MessageId" href="#">
+                                                    <img src="~/chatzy/assets/iconsax/save-2.svg" class="svgInvertColor" />&nbsp;
+                                                    <span>دانلود فایل</span>
+                                                </a>
+                                            }
+                                        }
+
+                                        if (!isSelf)
+                                        {
+                                            <a class="dropdown-item d-flex align-items-center actionReportMessage" data-messageid="@message.MessageId" href="#">
+                                                <img src="~/chatzy/assets/iconsax/alarm.svg" class="svgInvertColor" />&nbsp;
+                                                <span>گزارش تخلف</span>
+                                            </a>
+                                        }
+                                    }
+
+
+
+                                </div>
+                            </div>
+                            <!--/end message option menu-->
+
+
+                            <div class="message-box @(message.IsReadByAnyRecipient ? "read" : "")">
+                                @if (!isSelf)
+                                {
+                                    if (IsSystemMessage)
+                                    {
+                                        <img class="img-fluid person-img" src="~/assets/media/shared-photos/03.jpg" alt="p9">
+                                    }
+                                    else
+                                    {
+                                        <img class="img-fluid person-img" src="@(string.IsNullOrEmpty(message.SenderUser.ProfilePicName) ? "/assets/media/avatar/UserIcon.png" : "/assets/media/avatar/" + message.SenderUser.ProfilePicName)" alt="p9">
+
+                                    }
+                                }
+                                <div class="message-box-details">
+                                    @if (message.ReplyMessageId != null)
+                                    {
+                                        <div class="reply-preview border p-2 rounded bg-light mb-2" style="cursor:pointer;" data-reply-to-id="@message.ReplyMessageId}">
+                                            <div class="text-muted small">پاسخ به: <strong>@message.ReplyMessage?.SenderUser.NameFamily</strong></div>
+                                            <div class="text-truncate">@message.ReplyMessage?.MessageText?.MessageTxt</div>
+                                        </div>
+                                    }
+
+                                    <h5>
+                                        @Html.Raw(message.MessageText?.MessageTxt.Replace("\n", "<br />"))
+                                        @if (message.IsEdited)
+                                        {
+                                            <small class="text-muted fst-italic">(ویرایش شده)</small>
+                                        }
+
+                                    </h5>
+
+                                    <!--Message files-->
+                                    @if (message.MessageFiles != null)
+                                    {
+                                        <div class="row mt-1 overflow-hidden image-group">
+                                            @foreach (var file in message.MessageFiles)
+                                            {
+                                                string fileTumbPath = $"/api/Chat/downloadThumbnailById?messageFileId={file.MessageFileId}";
+
+                                                <div class="col file-attachment-item" data-file-id="@file.MessageFileId" style="display: flex; flex-direction: column;">
+
+                                                    <!--if attach file is image-->
+                                                    @if (AllowedImages.Contains(file.FileExtension.Extension, StringComparer.OrdinalIgnoreCase))
+                                                    {
+                                                        <img class="img-thumbnail chat-thumbnail"
+                                                             src="@fileTumbPath"
+                                                             data-original-filename="@file.OriginalFileName"
+                                                             alt="@file.FileName"
+                                                             style="max-height:150px; max-width:80px; cursor:pointer;">
+
+                                                    }
+                                                    else if (file.FileExtension.Extension == ".webm")
+                                                    {
+                                                        <div class="audio-player-container" data-file-id="@file.MessageFileId">
+
+                                                            <button class="voice-playback-btn">
+                                                                <!-- همان SVG که JS هم استفاده می‌کند -->
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#000"><g clip-path="url(#clip0_4418_9259)"><path d="M4 12.0004V8.44038C4 4.02038 7.13 2.21038 10.96 4.42038L14.05 6.20038L17.14 7.98038C20.97 10.1904 20.97 13.8104 17.14 16.0204L14.05 17.8004L10.96 19.5804C7.13 21.7904 4 19.9804 4 15.5604V12.0004Z" stroke="#fff" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_4418_9259"><rect width="24" height="24" fill="white"></rect></clipPath></defs></svg>
+                                                            </button>
+
+                                                            <div class="voice-timeline-container">
+                                                                <div class="voice-timeline-bg"></div>
+                                                                <div class="voice-timeline-progress"></div>
+                                                                <div class="voice-timeline-handle"></div>
+                                                            </div>
+
+                                                            <div class="voice-duration-display">0:00</div>
+
+                                                            <audio class="d-none" preload="metadata"></audio>
+
+                                                        </div>
+                                                    }
+
+                                                    else
+                                                    {
+                                                        <i class="iconsax" data-icon="document-text-1" style="font-size: 3em;"></i>
+                                                        @FileNameShorter.ShortenFileName(file.OriginalFileName ?? "")
+                                                        <span>&nbsp;</span>
+                                                        @FileSizeConverter.ConvertToReadableSize(file.FileSize)
+                                                        <span style="max-width:35px;" class="btn-download-file btn btn-sm btn-light p-0" data-file-id="@file.MessageFileId" data-file-originalName="@file.OriginalFileName">
+
+                                                            <img src="/chatzy/assets/iconsax/download.svg" class="download-icon" style="cursor:pointer; width: 24px; height: 24px;" alt="download">
+
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+
+                                    <div class="timing">
+                                        <h6>@message.MessageDateTime.ToLocalTime().ToString("HH:mm")</h6>
+                                        @if (isSelf)
+                                        {
+                                            <img class="img-fluid tick-all" src="~/chatzy/assets/images/svg/tick-all.svg" alt="tick" style="display: @(message.IsReadByAnyRecipient ? "inline" : "none");">
+                                            <img class="img-fluid tick" src="~/chatzy/assets/images/svg/tick.svg" alt="tick" style="display: @(message.IsReadByAnyRecipient ? "none" : "inline");">
+                                        }
+
+                                        @if (IsSystemMessage)
+                                        {
+                                            <h6>آموزشگاه</h6>
+                                        }
+                                        else if (!isSelf)
+                                        {
+                                            <h6>@message.SenderUser.NameFamily</h6>
+                                        }
+
+                                        @if (message.IsPin)
+                                        {
+                                            <img src="/chatzy/assets/iconsax/pin-1.svg" class="pinmedmessageIcon" style="width:20px;">
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+
+
+        </div>
+        <div class="chat-finished" id="chat-finished"></div>
+    </div>
+</section>
+<!-- group chat section end -->
+<!--  message input section starts -->
+<div class="messages-panel">
+    <!-- کانتینر برای بنرهای عملیاتی (پاسخ و ویرایش) -->
+    <div class="action-banners-container">
+        <span class="svg-arrow-down sticky-top mt-4 p-1 btn" style="display:none;">
+            <svg width="30px" height="30px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.9999 19L17.9999 13M11.9999 19L5.99988 13M11.9999 19L11.9999 5" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" /></svg>
+        </span>
+
+        <div id="cancel-edit-container" class="force-hide">
+            <div class="edit-bar"></div>
+            <div class="edit-indicator">
+                <span class="edit-text m-1">در حال ویرایش</span>
+              
+            </div>
+            <a href="#" id="cancel-edit-button">انصراف</a>
+        </div>
+
+
+        <div id="reply-to-container" style="display: none;">
+
+            <div class="reply-indicator">
+                <div class="reply-bar"></div>
+                <div class="reply-content">
+                    <!-- کانتینر تصویر کوچک (برای پیام‌های عکس) -->
+                    <div id="reply-thumbnail-container"></div>
+
+                    <!-- کانتینر جدید برای آیکون (برای صوت و فایل) -->
+                    <span id="reply-icon-container"></span>
+
+                    <!-- کانتینر برای متون -->
+                    <div class="reply-text-content">
+                        <span id="reply-to-user"></span>
+                        <span id="reply-to-text"></span>
+                    </div>
+                </div>
+
+            </div>
+            <a href="#" id="cancel-reply">
+                انصراف
+            </a>
+        </div>
+
+    </div>
+
+    <!-- کانتینر پیش‌نمایش فایل‌ها -->
+    <div id="filePreviewContainer">
+        <!-- File previews will be dynamically inserted here -->
+    </div>
+    <div id="emoji-picker" style="display: none;">
+        <div class="emoji-grid" style="">
+            <button class="emoji-btn border border-0 bg-white" data-emoji="😀">😀</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="😂">😂</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="😊">😊</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="❤️">❤️</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="👍">👍</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="👎">👎</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="😢">😢</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="😭">😭</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="🔥">🔥</button>
+            <button class="emoji-btn border border-0 bg-white" data-emoji="💯">💯</button>
+        </div>
+    </div>
+    <!-- فرم اصلی ورود پیام -->
+    <form onsubmit="return false;" class="message-form-container">
+        <div id="text-input-area" class="message-inputarea">
+            <a href="#" onclick="$('#fileInput').click(); return false;">
+                <i class="iconsax icon-btn" data-icon="picture-add"> </i>
+            </a>
+            <a class="btn-record-voice">
+                <i class="iconsax icon-btn" data-icon="mic-2"> </i>
+            </a>
+            <a href="#" class="btn-emoji-picker">
+                <i class="iconsax icon-btn" data-icon="emoji-happy"> </i>
+            </a>
+            <textarea type="text" class="message-input" id="message-input" placeholder="Type here..." rows="1"></textarea>
+            @*  <input type="text" name="name" value="" placeholder="Type here..." />*@
+            <a href="#" class="" id="send-message-button">
+                <i class="iconsax icon-btn" data-icon="send-btn1"> </i>
+            </a>
+        </div>
+        <div id="voice-input-area" style="display: none;"></div>
+        <input type="file" id="fileInput" multiple style="display: none;">
+        <input type="hidden" id="uploadedFileIds" name="uploadedFileIds">
+        <input type="hidden" id="previousFileIds" name="previousFileIds">
+        <input type="hidden" id="deletUploadedFileIds" name="deletUploadedFileIds">
+        <input type="hidden" id="message-context-id" value="">
+        <input type="hidden" id="message-action-type" value="">
+    </form>
+
+</div>
+
+
+
+
+
+<!--  message input section end -->
+
+<script>
+    $(document).ready(function () {
+        // تاخیر کوتاهی برای اطمینان از رندر شدن کامل DOM
+        setTimeout(function () {
+            const lastReadMessageId = parseInt($('#lastReadMessageId').val(), 10);
+            const chatContent = $('#chat_content');
+
+            if (lastReadMessageId > 0) {
+                const targetMessage = $(`#message-${lastReadMessageId}`);
+                if (targetMessage.length) {
+                    // اسکرول به پیام مورد نظر
+                    chatContent.scrollTop(targetMessage.offset().top - chatContent.offset().top + chatContent.scrollTop());
+                    console.log(`Scrolled to last read message: ${lastReadMessageId}`);
+                } else {
+                    // اگر پیام مورد نظر پیدا نشد، به آخرین پیام اسکرول کن
+                    const chatFinished = $('#chat-finished');
+                    if (chatFinished.length) {
+                        chatFinished[0].scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
+                    console.log(`Last read message ${lastReadMessageId} not found. Scrolling to bottom.`);
+                }
+            } else {
+                // اگر هیچ پیام خوانده نشده‌ای نبود، به آخرین پیام اسکرول کن
+                const chatFinished = $('#chat-finished');
+                if (chatFinished.length) {
+                    chatFinished[0].scrollIntoView({ behavior: 'auto', block: 'end' });
+                }
+                console.log("No last read message ID. Scrolling to bottom.");
+            }
+
+            // اسکرول pinned messages container به پایین برای نمایش جدیدترین
+            const pinnedContainer = $('.pinned-messages-container');
+            if (pinnedContainer.length) {
+                pinnedContainer.scrollTop(pinnedContainer[0].scrollHeight);
+            }
+        }, 100); // 100 میلی‌ثانیه تاخیر
+
+
+
+
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    // شرط دوم برای شناسایی iPad های جدید است
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // --- مدیریت کیبورد برای اندروید ---
+    if (isAndroid) {
+        console.log("Android detected. Applying standard scroll-into-view.");
+        $(document).on("focus", "#message-input", function() {
+            setTimeout(() => {
+                // برای اندروید، اسکرول کردن به پایین معمولاً کافی است
+                window.scrollTo(0, document.body.scrollHeight);
+                this.scrollIntoView({ block: "center", behavior: "smooth" });
+            }, 300); // یک تأخیر کوچک برای اطمینان از بالا آمدن کیبورد
+        });
+    }
+
+    // --- مدیریت کیبورد برای iOS با Visual Viewport API ---
+    if (isIOS) {
+            console.log("iOS detected. Applying Visual Viewport API handler.");
+
+            const messageInput = document.getElementById('message-input');
+            const messagesPanel = document.querySelector('.messages-panel');
+
+            if (messageInput && messagesPanel && window.visualViewport) {
+                let lastOffset = 0; // ذخیره offset قبلی برای جلوگیری از انباشت
+
+                const movePanel = () => {
+                    const viewportHeight = window.innerHeight;
+                    const visualViewportHeight = window.visualViewport.height;
+                    const offset = Math.max(0, viewportHeight - visualViewportHeight); // اطمینان از مثبت بودن offset
+
+                    // فقط اگر offset تغییر کرده، اعمال کن
+                    if (offset !== lastOffset) {
+                        requestAnimationFrame(() => {
+                            messagesPanel.style.transform = `translateY(-${offset}px)`;
+                            lastOffset = offset;
+                        });
+                    }
+                };
+
+                messageInput.addEventListener('focus', () => {
+                    setTimeout(movePanel, 300); // افزایش تاخیر برای دقت بیشتر
+                });
+
+                messageInput.addEventListener('blur', () => {
+                    requestAnimationFrame(() => {
+                        messagesPanel.style.transform = 'translateY(0)';
+                        lastOffset = 0;
+                    });
+                });
+
+                window.visualViewport.addEventListener('resize', () => {
+                    if (document.activeElement === messageInput) {
+                        movePanel();
+                    }
+                });
+            } else {
+                console.warn("Visual Viewport API not supported or required elements not found.");
+            }
+        }
+
+    });
+
+
+</script>
+
+
+
+
+
+
+
+
+

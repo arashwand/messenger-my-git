@@ -1,0 +1,6 @@
+@DatabaseMigrationTool_HostAddress = http://localhost:5015
+
+GET {{DatabaseMigrationTool_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

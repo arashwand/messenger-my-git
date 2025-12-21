@@ -1,0 +1,253 @@
+@model LoginVM
+@{
+    ViewData["Title"] = "ورود به پیام رسان";
+    Layout = null;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+@section Styles {
+    <style>
+        /*  body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                            direction: rtl;
+                        }
+                        */
+
+
+    </style>
+}
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود به پیام رسان</title>
+    <link rel="icon" href="~/chatzy/assets/images/LOGO-118x118.png" type="image/x-icon">
+    <link rel="apple-touch-icon" href="~/chatzy/assets/images/LOGO-118x118.png">
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+    <link href="/css/loginStyle.css" rel="stylesheet" asp-append-version="true" />
+
+</head>
+<body>
+    <!-- Space Background -->
+    <div class="space-bg"></div>
+
+    <!-- Stars -->
+    <div class="stars" id="stars"></div>
+
+    <!-- Space Objects -->
+    <div class="space-objects">
+        <div class="planet planet-1"></div>
+        <div class="planet planet-2"></div>
+        <div class="planet planet-3"></div>
+        <div class="planet saturn"></div>
+        <div class="shooting-star"></div>
+        <div class="shooting-star"></div>
+        <div class="shooting-star"></div>
+        <div class="rocket">🚀</div>
+    </div>
+
+    <!-- Login Container -->
+    <div class="login-container">
+        <div class="login-card">
+            <!-- Logo -->
+            <div class="logo-container">
+                <div class="logo">
+                    <img src="~/chatzy/assets/images/LOGO-118x118.png" alt="logo" />
+                </div>
+                <h1 class="logo-text">Iran Europe Messenger</h1>
+                <p class="logo-subtitle">پیام رسان اختصاصی ایران اروپا</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="returnUrl" value="@(ViewData["ReturnUrl"] ?? String.Empty)" />
+
+                <!-- added stable id so JS can reliably find the validation container -->
+                <div asp-validation-summary="ModelOnly" id="validationSummary" class="text-danger"></div>
+                <div class="form-group">
+                    <label class="form-label" asp-for="LoginCode">کد ملی یا کد دانشجویی</label>
+                    <div class="input-wrapper">
+                        <input type="text" asp-for="LoginCode" class="form-input" placeholder="0012345678" dir="ltr">
+                        <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" asp-for="Password">رمز عبور</label>
+                    <div class="input-wrapper">
+                        <input type="password" asp-for="Password" class="form-input" placeholder="رمز عبور خود را وارد کنید" dir="ltr">
+                        <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        <button type="button" class="password-toggle" onclick="togglePassword()">
+                            <svg id="eyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox">
+                        <span class="checkbox-custom">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </span>
+                        مرا به خاطر بسپار
+                    </label>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    ورود به پیام رسان
+                </button>
+            </form>
+        </div>
+    </div>
+    <script>
+
+         // Generate Stars
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            const starCount = 150;
+
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+
+                const size = Math.random() * 3 + 1;
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                const duration = Math.random() * 3 + 2;
+                const minOpacity = Math.random() * 0.3 + 0.2;
+
+                star.style.cssText = `
+                    width: ${size}px;
+                    height: ${size}px;
+                    left: ${x}%;
+                    top: ${y}%;
+                    --duration: ${duration}s;
+                    --min-opacity: ${minOpacity};
+                `;
+
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // Toggle Password Visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('passwordInput');
+            const eyeIcon = document.getElementById('eyeIcon');
+
+            if (!passwordInput || !eyeIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.innerHTML = `
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                `;
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                `;
+            }
+        }
+
+        function getReturnUrl() {
+            const hidden = document.getElementById('returnUrl')?.value;
+            if (hidden && hidden.trim()) return hidden;
+            const q = new URLSearchParams(window.location.search);
+            return q.get('returnUrl') || q.get('ReturnUrl') || '';
+        }
+
+
+        // AJAX Form Submit to /Account/Login (fixed)
+        (function () {
+            const form = document.getElementById('loginForm');
+            if (!form) return;
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const btn = document.querySelector('.submit-btn');
+                const validationDiv = document.getElementById('validationSummary') || document.createElement('div');
+
+                const loginCode = (document.getElementById('LoginCode')?.value || '').trim();
+                const password = (document.getElementById('Password')?.value || '');
+                const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                const antiForgeryToken = tokenEl ? tokenEl.value : null;
+
+                // robust returnUrl read
+                const returnUrl = getReturnUrl();
+
+                // build URL with query string (only if have returnUrl)
+                let loginUrl = '/Account/Login';
+                if (returnUrl) loginUrl += '?returnUrl=' + encodeURIComponent(returnUrl);
+
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json,text/html'
+                };
+                if (antiForgeryToken) headers['RequestVerificationToken'] = antiForgeryToken;
+
+                try {
+                    const response = await fetch(loginUrl, {
+                        method: 'POST',
+                        headers,
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ LoginCode: loginCode, Password: password })
+                    });
+
+                    // اگر پاسخ JSON حاوی redirect باشد
+                    const contentType = response.headers.get('content-type') || '';
+                    if (response.ok && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = data.redirect || returnUrl || '/home/index';
+                            return;
+                        } else {
+                            validationDiv.innerHTML = data.message || JSON.stringify(data.errors || 'خطای ورود');
+                            return;
+                        }
+                    }
+
+                    // اگر fetch به صورت redirect دنبال شده باشد، می‌توانید fallback کنید
+                    if (response.redirected) {
+                        window.location.href = returnUrl || '/home/index';
+                        return;
+                    }
+                    // fallback برای HTML
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    validationDiv.innerHTML = doc.querySelector('.text-danger')?.textContent?.trim() || 'خطای ورود';
+                } catch (err) {
+                    validationDiv.innerHTML = 'خطا در ارسال درخواست.';
+                }
+            });
+        })();
+
+        // Initialize
+        createStars();
+    </script>
+</body>
+</html>
+
+
+@section Scripts
+{
+    <partial name="_ValidationScriptsPartial" />
+
+
+}

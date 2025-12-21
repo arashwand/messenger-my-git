@@ -1,0 +1,51 @@
+@model LoginVM
+@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+}
+@section Styles{
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            direction: rtl;
+        }
+
+        
+
+    </style>
+}
+<!-- login page start -->
+<div class="login-img">
+    <img class="img-fluid img" src="~/chatzy/assets/images/login-vector.svg" alt="login-img">
+</div>
+<div class="custom-container">
+    <h2 class="login-title">ورود</h2>
+    <h3 class="login-content">پورتال اختصاصی چت آموزشگاه زبان ایران اروپا.</h3>
+    <form class="auth-form pb-3" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <div class="form-group mt-4">
+            <label class="form-label fw-semibold dark-text" asp-for="LoginCode">نام کاربری</label>
+            <div class="form-input">
+                <input asp-for="LoginCode" class="form-control" placeholder="نام کاربری خود را وارد کنید" required dir="ltr">
+            </div>
+            <span asp-validation-for="LoginCode" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mt-2">
+            <label class="form-label fw-semibold dark-text" asp-for="Password">رمز عبور</label>
+            <div class="form-input">
+                <input type="password" asp-for="Password" class="form-control" placeholder="رمز عبور خود را وارد کنید" required dir="ltr">
+            </div>
+            <span asp-validation-for="Password" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn theme-btn w-100 mt-4">ورود</button>
+    </form>
+</div>
+<!-- login page end -->
+
+@section Scripts
+{
+    <partial name="_ValidationScriptsPartial" />
+}
