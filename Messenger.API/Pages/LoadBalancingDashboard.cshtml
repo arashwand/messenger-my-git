@@ -1,0 +1,384 @@
+@page
+@model Messenger.API.Pages.LoadBalancingDashboardModel
+@{
+    ViewData["Title"] = "داشبورد Load Balancing";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .metric-icon {
+            font-size: 2rem;
+            opacity: 0.3;
+            float: left;
+        }
+        
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .status-normal {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .progress-bar-container {
+            height: 30px;
+            background-color: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .queue-table {
+            width: 100%;
+            margin-top: 1rem;
+        }
+        
+        .queue-table th {
+            background-color: #f8f9fa;
+            padding: 0.75rem;
+            text-align: right;
+        }
+        
+        .queue-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .refresh-indicator {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+        
+        @@keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .auto-refresh-badge {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- Auto-refresh indicator -->
+        <div class="auto-refresh-badge">
+            <span class="badge bg-info">
+                <i class="fas fa-sync-alt refresh-indicator"></i>
+                به‌روزرسانی خودکار: هر 5 ثانیه
+            </span>
+        </div>
+
+        <!-- Header -->
+        <div class="dashboard-header text-center">
+            <h1><i class="fas fa-tachometer-alt me-2"></i>داشبورد Load Balancing</h1>
+            <p class="mb-0">نظارت بر وضعیت سیستم و صف پیامها</p>
+            <small>آخرین به‌روزرسانی: <span id="lastUpdate">@DateTime.Now.ToString("HH:mm:ss")</span></small>
+        </div>
+
+        <!-- System Status Alert -->
+        @if (Model.IsSystemUnderPressure)
+        {
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>هشدار!</strong> سیستم تحت فشار است. پیامها به صورت خودکار به صف منتقل میشوند.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <div class="row">
+            <!-- CPU Usage -->
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <i class="fas fa-microchip metric-icon text-primary"></i>
+                    <div class="metric-label">استفاده از CPU</div>
+                    <div class="metric-value text-primary" id="cpuUsage">@Model.CpuUsage.ToString("F1")%</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill @GetProgressColorClass(Model.CpuUsage, 70)" 
+                             style="width: @Model.CpuUsage%">
+                            @Model.CpuUsage.ToString("F0")%
+                        </div>
+                    </div>
+                    <small class="text-muted">حد آستانه: 70%</small>
+                </div>
+            </div>
+
+            <!-- Memory Usage -->
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <i class="fas fa-memory metric-icon text-success"></i>
+                    <div class="metric-label">استفاده از حافظه</div>
+                    <div class="metric-value text-success" id="memoryUsage">@Model.MemoryUsage.ToString("F1")%</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill @GetProgressColorClass(Model.MemoryUsage, 75)" 
+                             style="width: @Model.MemoryUsage%">
+                            @Model.MemoryUsage.ToString("F0")%
+                        </div>
+                    </div>
+                    <small class="text-muted">حد آستانه: 75%</small>
+                </div>
+            </div>
+
+            <!-- Active Connections -->
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <i class="fas fa-users metric-icon text-info"></i>
+                    <div class="metric-label">کاربران آنلاین</div>
+                    <div class="metric-value text-info" id="activeConnections">@Model.ActiveConnections</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill @GetProgressColorClass((Model.ActiveConnections / 500.0) * 100, 100)" 
+                             style="width: @Math.Min((Model.ActiveConnections / 500.0) * 100, 100)%">
+                            @Model.ActiveConnections
+                        </div>
+                    </div>
+                    <small class="text-muted">حد آستانه: 500</small>
+                </div>
+            </div>
+
+            <!-- System Load Score -->
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <i class="fas fa-chart-line metric-icon text-warning"></i>
+                    <div class="metric-label">امتیاز بار سیستم</div>
+                    <div class="metric-value text-warning" id="systemLoadScore">@Model.SystemLoadScore.ToString("F2")</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill @GetProgressColorClass(Model.SystemLoadScore * 100, 70)" 
+                             style="width: @(Model.SystemLoadScore * 100)%">
+                            @((Model.SystemLoadScore * 100).ToString("F0"))%
+                        </div>
+                    </div>
+                    <small class="text-muted">0 = بدون فشار، 1 = فشار حداکثر</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Queue Statistics -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="metric-card">
+                    <h3><i class="fas fa-list-alt me-2"></i>آمار صف پیامها (Hangfire)</h3>
+                    <div class="row mt-3">
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-clock fa-2x text-secondary mb-2"></i>
+                                <h4>@Model.EnqueuedCount</h4>
+                                <small>در صف</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-spinner fa-2x text-primary mb-2"></i>
+                                <h4>@Model.ProcessingCount</h4>
+                                <small>در حال پردازش</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                <h4>@Model.SucceededCount</h4>
+                                <small>موفق</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
+                                <h4>@Model.FailedCount</h4>
+                                <small>ناموفق</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
+                                <h4>@Model.ScheduledCount</h4>
+                                <small>زمانبندی شده</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-trash fa-2x text-muted mb-2"></i>
+                                <h4>@Model.DeletedCount</h4>
+                                <small>حذف شده</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Queue Details by Priority -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="metric-card">
+                    <h3><i class="fas fa-layer-group me-2"></i>تفکیک صفها بر اساس اولویت</h3>
+                    <table class="queue-table">
+                        <thead>
+                            <tr>
+                                <th>نام صف</th>
+                                <th>اولویت</th>
+                                <th>تعداد</th>
+                                <th>وضعیت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var queue in new[] { 
+                                new { Name = "critical", Label = "بحرانی", Color = "danger" },
+                                new { Name = "high", Label = "بالا", Color = "warning" },
+                                new { Name = "default", Label = "عادی", Color = "info" },
+                                new { Name = "low", Label = "پایین", Color = "secondary" }
+                            })
+                            {
+                                <tr>
+                                    <td><strong>@queue.Name</strong></td>
+                                    <td><span class="badge bg-@queue.Color">@queue.Label</span></td>
+                                    <td><strong>@(Model.QueueCounts.ContainsKey(queue.Name) ? Model.QueueCounts[queue.Name] : 0)</strong></td>
+                                    <td>
+                                        @if (Model.QueueCounts.ContainsKey(queue.Name) && Model.QueueCounts[queue.Name] > 0)
+                                        {
+                                            <i class="fas fa-circle text-success"></i> <span>فعال</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="fas fa-circle text-muted"></i> <span>خالی</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="row mt-4">
+            <div class="col-md-12 text-center">
+                <a href="/hangfire" class="btn btn-primary btn-lg me-2">
+                    <i class="fas fa-chart-bar me-2"></i>داشبورد Hangfire
+                </a>
+                <button onclick="location.reload()" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-sync-alt me-2"></i>بروزرسانی دستی
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh metrics every 5 seconds
+        setInterval(async function() {
+            try {
+                const response = await fetch('?handler=Metrics');
+                const data = await response.json();
+                
+                if (!data.error) {
+                    // Update CPU
+                    document.getElementById('cpuUsage').textContent = data.cpuUsage.toFixed(1) + '%';
+                    
+                    // Update Memory
+                    document.getElementById('memoryUsage').textContent = data.memoryUsage.toFixed(1) + '%';
+                    
+                    // Update Connections
+                    document.getElementById('activeConnections').textContent = data.activeConnections;
+                    
+                    // Update Load Score
+                    document.getElementById('systemLoadScore').textContent = data.systemLoadScore.toFixed(2);
+                    
+                    // Update timestamp
+                    const now = new Date();
+                    document.getElementById('lastUpdate').textContent = now.toLocaleTimeString('fa-IR');
+                }
+            } catch (error) {
+                console.error('Error refreshing metrics:', error);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
+
+@functions {
+    private string GetProgressColorClass(double value, double threshold)
+    {
+        if (value < threshold * 0.7)
+            return "bg-success";
+        else if (value < threshold)
+            return "bg-warning";
+        else
+            return "bg-danger";
+    }
+}

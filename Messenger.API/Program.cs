@@ -45,6 +45,7 @@ builder.Services.Configure<TimeSettingOptions>(
 // Create Configuration variable to read from appSettings.json  
 var Configuration = builder.Configuration;
 builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages(); // Add Razor Pages support for Load Balancing Dashboard
 
 builder.Services.AddMemoryCache();
 
@@ -451,6 +452,7 @@ app.UseSwaggerUI(c =>
 
 // 7. Endpoints: Endpointهای برنامه (Controllers, Hubs, etc.) را تعریف می‌کند.
 app.MapControllers();
+app.MapRazorPages(); // Map Razor Pages for Load Balancing Dashboard
 app.MapHub<ChatHub>("/chathub");
 app.MapControllerRoute(
     name: "default",
