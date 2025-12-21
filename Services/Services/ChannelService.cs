@@ -287,6 +287,30 @@ namespace Messenger.Services.Services
             return await ChannelMembersAsync(channelId);
         }
 
+        /// <summary>
+        /// دریافت تعداد اعضای کانال
+        /// </summary>
+        public async Task<int> GetChannelMembersCountAsync(long channelId)
+        {
+            Console.WriteLine($"Getting member count for channel {channelId}");
+            
+            try
+            {
+                // Count members via ChannelMembers table
+                var count = await _context.ChannelMembers
+                    .Where(cm => cm.ChannelId == channelId)
+                    .CountAsync();
+
+                Console.WriteLine($"Channel {channelId} has {count} members");
+                return count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting member count for channel {channelId}: {ex.Message}");
+                return 0;
+            }
+        }
+
         private async Task<IEnumerable<UserDto>> ChannelMembersAsync(long channelId)
         {
             Console.WriteLine($"Getting members for channel {channelId}");

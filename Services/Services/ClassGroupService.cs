@@ -842,6 +842,38 @@ namespace Messenger.Services.Services
             return await GetMembersQuery(classId);
         }
 
+        /// <summary>
+        /// دریافت تعداد اعضای گروه کلاسی
+        /// </summary>
+        public async Task<int> GetClassGroupMembersCountAsync(long classId)
+        {
+            _logger.LogInformation("Getting member count for class group ID: {ClassId}", classId);
+            
+            try
+            {
+                // Validate class group exists
+                var classGroupExists = await _context.ClassGroups.AnyAsync(cg => cg.ClassId == classId);
+                if (!classGroupExists)
+                {
+                    _logger.LogWarning("GetClassGroupMembersCountAsync: Class group {ClassId} not found.", classId);
+                    return 0;
+                }
+
+                // Count members via UserClassGroup table
+                var count = await _context.UserClassGroups
+                    .Where(ucg => ucg.ClassId == classId)
+                    .CountAsync();
+
+                _logger.LogInformation("Class group {ClassId} has {Count} members", classId, count);
+                return count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting member count for class group {ClassId}", classId);
+                return 0;
+            }
+        }
+
         private async Task<IEnumerable<UserDto>> GetMembersQuery(long classId)
         {
             _logger.LogInformation("Getting members for class group ID: {ClassId}", classId);

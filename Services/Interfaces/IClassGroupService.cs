@@ -24,6 +24,13 @@ namespace Messenger.Services.Interfaces
         /// <param name="targetId"></param>
         /// <returns></returns>
         Task<IEnumerable<UserDto>> GetClassGroupMembersInternalAsync( long targetId);
+
+        /// <summary>
+        /// دریافت تعداد اعضای گروه کلاسی
+        /// </summary>
+        /// <param name="targetId">شناسه گروه</param>
+        /// <returns>تعداد اعضا</returns>
+        Task<int> GetClassGroupMembersCountAsync(long targetId);
         
         Task<bool> IsUserMemberOfClassGroupAsync(long userId, long targetId);
 

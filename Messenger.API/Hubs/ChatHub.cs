@@ -388,27 +388,30 @@ namespace Messenger.API.Hubs
             bool isBridge = IsBridge();
             if (!isBridge) request.UserId = GetCurrentUserId();
 
+            // اضافه کردن به صف Hangfire
+            var queuedMessage = new QueuedMessageDto
+            {
+                UserId = request.UserId,
+                GroupId = request.GroupId,
+                GroupType = request.GroupType,
+                MessageText = request.MessageText,
+                FileAttachementIds = request.FileAttachementIds,
+                ReplyToMessageId = request.ReplyToMessageId,
+                ClientMessageId = request.ClientMessageId,
+                QueuedAt = DateTime.UtcNow
+            };
+
             // بررسی آیا پیام باید در صف قرار گیرد یا فوری ارسال شود
-            bool shouldQueue = await DetermineIfShouldQueue(request);
+            var (shouldQueue, priority) = await DetermineIfShouldQueue(request);
 
             if (shouldQueue)
             {
-                // اضافه کردن به صف Hangfire
-                var queuedMessage = new QueuedMessageDto
-                {
-                    UserId = request.UserId,
-                    GroupId = request.GroupId,
-                    GroupType = request.GroupType,
-                    MessageText = request.MessageText,
-                    FileAttachementIds = request.FileAttachementIds,
-                    ReplyToMessageId = request.ReplyToMessageId,
-                    ClientMessageId = request.ClientMessageId,
-                    QueuedAt = DateTime.UtcNow
-                };
+                queuedMessage.Priority = priority;
 
                 var jobId = _messageQueueService.EnqueueMessage(queuedMessage);
 
-                _logger.LogInformation("Message queued with JobId: {JobId} from user {UserId}", jobId, request.UserId);
+                _logger.LogInformation("Message queued with JobId: {JobId} from user {UserId} with priority {Priority}", 
+                    jobId, request.UserId, priority);
 
                 // اعلام به کاربر که پیام در صف قرار گرفت
                 await Clients.Caller.SendAsync("MessageQueued", new
@@ -416,6 +419,7 @@ namespace Messenger.API.Hubs
                     jobId,
                     clientMessageId = request.ClientMessageId,
                     status = "queued",
+                    priority = priority.ToString(),
                     estimatedProcessTime = "2-5 seconds"
                 });
 
@@ -490,32 +494,52 @@ namespace Messenger.API.Hubs
         }
 
         /// <summary>
-        /// تصمیمگیری برای صفبندی یا ارسال فوری پیام
+        /// تصمیمگیری برای صفبندی یا ارسال فوری پیام با استراتژی فازبندی
         /// </summary>
-        private async Task<bool> DetermineIfShouldQueue(SendMessageRequestDto request)
+        /// <returns>Tuple حاوی: (آیا باید در صف قرار گیرد، اولویت پیام)</returns>
+        private async Task<(bool shouldQueue, MessagePriority priority)> DetermineIfShouldQueue(SendMessageRequestDto request)
         {
-            // فعلاً همیشه false برمیگردانیم تا ارسال فوری باشد (backward compatibility)
-            // در آینده میتوان منطق صفبندی را بر اساس شرایط زیر اضافه کرد:
-            // - اگر فایلهای بزرگ دارد
-            // - اگر تعداد اعضای گروه بالاست
-            // - اگر سیستم تحت فشار است
+            try
+            {
+                // فاز 1: بررسی تعداد اعضای گروه (Canary Deployment)
+                var memberCount = request.GroupType == ConstChat.ClassGroupType
+                    ? await _classGroupService.GetClassGroupMembersCountAsync(request.GroupId)
+                    : await _channelService.GetChannelMembersCountAsync(request.GroupId);
 
-            // مثال: اگر تعداد فایلها بیش از 5 باشد، در صف قرار بگیرد
-            // if (request.FileAttachementIds != null && request.FileAttachementIds.Count > 5)
-            // {
-            //     return true;
-            // }
+                if (memberCount > 50)
+                {
+                    // گروههای بزرگتر از 200 نفر با اولویت بالا
+                    if (memberCount > 200)
+                    {
+                        _logger.LogInformation("Queueing message for large group (>{Count} members) with HIGH priority", memberCount);
+                        return (true, MessagePriority.High);
+                    }
+                    
+                    // گروههای 50-200 نفر با اولویت عادی
+                    _logger.LogInformation("Queueing message for medium group ({Count} members) with NORMAL priority", memberCount);
+                    return (true, MessagePriority.Normal);
+                }
 
-            // مثال: اگر تعداد اعضای گروه بیش از 100 نفر باشد
-            // var memberCount = request.GroupType == ConstChat.ClassGroupType
-            //     ? await _classGroupService.GetClassGroupMembersCountAsync(request.GroupId)
-            //     : await _channelService.GetChannelMembersCountAsync(request.GroupId);
-            // if (memberCount > 100)
-            // {
-            //     return true;
-            // }
+                // فاز 2: بررسی پیامهای حجیم (با 3 یا بیشتر فایل پیوست)
+                if (request.FileAttachementIds != null && request.FileAttachementIds.Count >= 3)
+                {
+                    _logger.LogInformation("Queueing message with {FileCount} attachments with HIGH priority", 
+                        request.FileAttachementIds.Count);
+                    return (true, MessagePriority.High);
+                }
 
-            return await Task.FromResult(false);
+                // فاز 3 و 4: آماده برای افزودن در آینده
+                // - Load Balancing: بررسی فشار سیستم
+                // - Scheduled Messages: پیامهای برنامهریزی شده
+
+                // پیشفرض: ارسال فوری
+                return (false, MessagePriority.Normal);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in DetermineIfShouldQueue, defaulting to immediate send");
+                return (false, MessagePriority.Normal);
+            }
         }
 
         public async Task EditMessage(EditMessageRequestDto request)
