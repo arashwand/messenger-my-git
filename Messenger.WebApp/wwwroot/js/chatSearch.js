@@ -229,7 +229,22 @@
         showLoading();
 
         try {
-            const response = await fetch(`/api/chat/searchUsers?query=${encodeURIComponent(query)}`);
+            // Get CSRF token if available
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            // Add CSRF token if available
+            if (token) {
+                headers['RequestVerificationToken'] = token;
+            }
+
+            const response = await fetch(`/api/chat/searchUsers?query=${encodeURIComponent(query)}`, {
+                method: 'GET',
+                headers: headers,
+                credentials: 'same-origin'
+            });
             
             if (!response.ok) {
                 if (response.status === 403) {
@@ -301,7 +316,6 @@
         div.style.cursor = 'pointer';
         
         const profilePic = user.profilePicName || 'UserIcon.png';
-        const baseUrl = document.getElementById('baseUrl')?.value || '';
         const profileImageUrl = `/assets/media/avatar/${profilePic}`;
 
         div.innerHTML = `
@@ -343,7 +357,7 @@
             // If so, open it. If not, the chat will be created when the first message is sent
             // For now, we'll just clear the search and show a message
             
-            showMessage(`شروع چت با ${user.nameFamily}...`, 'success');
+            showMessage(`شروع چت با ${user.nameFamily}...`, 'info');
             
             // Clear search
             clearSearch();
@@ -354,8 +368,8 @@
             // 2. If yes, open the chat
             // 3. If no, prepare to create a new chat when user sends first message
             
-            // For now, show a notification
-            alert(`قابلیت شروع چت خصوصی با ${user.nameFamily} به زودی فعال می‌شود`);
+            // For now, show a notification using toast system
+            showMessage(`قابلیت شروع چت خصوصی با ${user.nameFamily} به زودی فعال می‌شود`, 'info');
             
         } catch (error) {
             console.error('[ChatSearch] Error starting private chat:', error);
