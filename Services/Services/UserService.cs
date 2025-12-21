@@ -267,19 +267,13 @@ namespace Messenger.Services.Services
                 
                 // فعلاً که فیلد کد ملی وجود ندارد، از جستجوی نام استفاده می‌کنیم
                 _logger.LogWarning("National code search requested but field not available in User model. Falling back to name search.");
-                usersQuery = usersQuery.Where(u => 
-                    u.NameFamily.Contains(query) || 
-                    u.DeptName.Contains(query)
-                );
             }
-            else
-            {
-                // جستجو بر اساس نام (پیشفرض)
-                usersQuery = usersQuery.Where(u => 
-                    u.NameFamily.Contains(query) || 
-                    u.DeptName.Contains(query)
-                );
-            }
+            
+            // جستجو بر اساس نام (برای هر دو حالت name و nationalCode تا زمانی که فیلد کد ملی اضافه شود)
+            usersQuery = usersQuery.Where(u => 
+                u.NameFamily.Contains(query) || 
+                u.DeptName.Contains(query)
+            );
 
             var userEntities = await usersQuery.ToListAsync();
 

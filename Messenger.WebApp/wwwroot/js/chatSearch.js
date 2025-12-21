@@ -137,6 +137,13 @@
         }, SEARCH_DELAY);
     }
 
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // جستجوی محلی برای Teacher
     function searchInChatsLocal(query) {
         const lowerQuery = query.toLowerCase();
@@ -159,10 +166,11 @@
         html += '<h6 style="padding: 0 0 10px 0; color: rgba(var(--dark-text), 1);">نتایج جستجو:</h6>';
         
         results.forEach(chat => {
+            const escapedName = escapeHtml(chat.name);
             html += `
-                <div class="search-result-item" data-chat-id="${chat.id}">
+                <div class="search-result-item" data-chat-id="${escapeHtml(chat.id)}">
                     <div class="search-result-info">
-                        <p class="search-result-name">${chat.name}</p>
+                        <p class="search-result-name">${escapedName}</p>
                     </div>
                 </div>
             `;
@@ -227,23 +235,24 @@
         html += '<h6 style="padding: 0 0 10px 0; color: rgba(var(--dark-text), 1);">نتایج جستجو:</h6>';
 
         users.forEach(user => {
+            const escapedDisplayName = escapeHtml(user.nameFamily || 'بدون نام');
+            const escapedRoleFa = escapeHtml(user.roleFaName || user.roleName || '');
+            const escapedDept = user.deptName ? ` - ${escapeHtml(user.deptName)}` : '';
+            
+            // avatar URL is constructed server-side, but escape for safety
             const avatarUrl = user.profilePicName ? 
-                `${baseUrl}/uploads/thumb/1/${user.profilePicName}` : 
+                `${baseUrl}/uploads/thumb/1/${encodeURIComponent(user.profilePicName)}` : 
                 '/chatzy/assets/images/avatar/UserIcon.png';
 
-            const displayName = user.nameFamily || 'بدون نام';
-            const roleFa = user.roleFaName || user.roleName || '';
-            const dept = user.deptName ? ` - ${user.deptName}` : '';
-
             html += `
-                <div class="search-result-item" data-user-id="${user.userId}" data-user-name="${displayName}">
-                    <img src="${avatarUrl}" 
-                         alt="${displayName}" 
+                <div class="search-result-item" data-user-id="${user.userId}" data-user-name="${escapedDisplayName}">
+                    <img src="${escapeHtml(avatarUrl)}" 
+                         alt="${escapedDisplayName}" 
                          class="search-result-avatar" 
                          onerror="this.src='/chatzy/assets/images/avatar/UserIcon.png'">
                     <div class="search-result-info">
-                        <p class="search-result-name">${displayName}</p>
-                        <p class="search-result-role">${roleFa}${dept}</p>
+                        <p class="search-result-name">${escapedDisplayName}</p>
+                        <p class="search-result-role">${escapedRoleFa}${escapedDept}</p>
                     </div>
                 </div>
             `;
