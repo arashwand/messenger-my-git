@@ -38,6 +38,7 @@ namespace Messenger.API.ServiceHelper
 
         /// <summary>
         /// دریافت درصد استفاده از CPU (با cache برای کاهش overhead)
+        /// از آخرین مقدار cache استفاده میکند یا مقدار پیشفرض را برمیگرداند
         /// </summary>
         public async Task<double> GetCpuUsageAsync()
         {
@@ -49,26 +50,24 @@ namespace Messenger.API.ServiceHelper
                     return cachedValue;
                 }
 
-                // محاسبه CPU usage
-                var startTime = DateTime.UtcNow;
-                var startCpuUsage = _currentProcess.TotalProcessorTime;
+                // اگر cache وجود ندارد، یک مقدار تخمینی بر اساس Process info برمیگردانیم
+                // بدون delay برای جلوگیری از latency در تصمیمگیری
+                _currentProcess.Refresh();
+                var cpuTime = _currentProcess.TotalProcessorTime.TotalMilliseconds;
+                var processUptime = (DateTime.UtcNow - _currentProcess.StartTime).TotalMilliseconds;
+                
+                if (processUptime > 0)
+                {
+                    var cpuUsagePercentage = (cpuTime / (Environment.ProcessorCount * processUptime)) * 100;
+                    
+                    // ذخیره در cache
+                    _cache.Set(CpuCacheKey, cpuUsagePercentage, TimeSpan.FromSeconds(CacheExpirationSeconds));
+                    
+                    _logger.LogDebug("CPU Usage (estimated): {CpuUsage:F2}%", cpuUsagePercentage);
+                    return Math.Round(cpuUsagePercentage, 2);
+                }
 
-                await Task.Delay(500); // نمونهبرداری 500 میلیثانیه
-
-                var endTime = DateTime.UtcNow;
-                var endCpuUsage = _currentProcess.TotalProcessorTime;
-
-                var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
-                var totalMsPassed = (endTime - startTime).TotalMilliseconds;
-                var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
-
-                var cpuUsagePercentage = cpuUsageTotal * 100;
-
-                // ذخیره در cache
-                _cache.Set(CpuCacheKey, cpuUsagePercentage, TimeSpan.FromSeconds(CacheExpirationSeconds));
-
-                _logger.LogDebug("CPU Usage: {CpuUsage:F2}%", cpuUsagePercentage);
-                return Math.Round(cpuUsagePercentage, 2);
+                return await Task.FromResult(0.0);
             }
             catch (Exception ex)
             {
