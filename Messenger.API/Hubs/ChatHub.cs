@@ -22,6 +22,7 @@ namespace Messenger.API.Hubs
         private readonly IRedisUnreadManage _redisUnreadManage;
         private readonly ILogger<ChatHub> _logger;
         private readonly PushService _pushService;
+        private readonly IMessageQueueService _messageQueueService;
 
         private const string BridgeGroupName = "BRIDGE_SERVICES";
 
@@ -32,7 +33,8 @@ namespace Messenger.API.Hubs
                        IRedisUserStatusService userStatusService,
                        RedisLastMessageService redisLastMessage,
                        IRedisUnreadManage redisUnreadManage,
-                       PushService pushService)
+                       PushService pushService,
+                       IMessageQueueService messageQueueService)
         {
             _messageService = messageService;
             _classGroupService = classGroupService;
@@ -42,6 +44,7 @@ namespace Messenger.API.Hubs
             _redisUnreadManage = redisUnreadManage;
             _logger = logger;
             _pushService = pushService;
+            _messageQueueService = messageQueueService;
         }
 
         // =================== Connection lifecycle ===================
@@ -385,6 +388,41 @@ namespace Messenger.API.Hubs
             bool isBridge = IsBridge();
             if (!isBridge) request.UserId = GetCurrentUserId();
 
+            // بررسی آیا پیام باید در صف قرار گیرد یا فوری ارسال شود
+            bool shouldQueue = await DetermineIfShouldQueue(request);
+
+            if (shouldQueue)
+            {
+                // اضافه کردن به صف Hangfire
+                var queuedMessage = new QueuedMessageDto
+                {
+                    UserId = request.UserId,
+                    GroupId = request.GroupId,
+                    GroupType = request.GroupType,
+                    MessageText = request.MessageText,
+                    FileAttachementIds = request.FileAttachementIds,
+                    ReplyToMessageId = request.ReplyToMessageId,
+                    ClientMessageId = request.ClientMessageId,
+                    QueuedAt = DateTime.UtcNow
+                };
+
+                var jobId = _messageQueueService.EnqueueMessage(queuedMessage);
+
+                _logger.LogInformation("Message queued with JobId: {JobId} from user {UserId}", jobId, request.UserId);
+
+                // اعلام به کاربر که پیام در صف قرار گرفت
+                await Clients.Caller.SendAsync("MessageQueued", new
+                {
+                    jobId,
+                    clientMessageId = request.ClientMessageId,
+                    status = "queued",
+                    estimatedProcessTime = "2-5 seconds"
+                });
+
+                return;
+            }
+
+            // ارسال فوری (کد قبلی)
             var savedMessageDto = await _messageService.SendGroupMessageAsync(request.UserId, request.GroupId, request.GroupType, request.MessageText, request.FileAttachementIds, request.ReplyToMessageId);
             if (savedMessageDto == null)
             {
@@ -449,6 +487,35 @@ namespace Messenger.API.Hubs
             }
 
             await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// تصمیمگیری برای صفبندی یا ارسال فوری پیام
+        /// </summary>
+        private async Task<bool> DetermineIfShouldQueue(SendMessageRequestDto request)
+        {
+            // فعلاً همیشه false برمیگردانیم تا ارسال فوری باشد (backward compatibility)
+            // در آینده میتوان منطق صفبندی را بر اساس شرایط زیر اضافه کرد:
+            // - اگر فایلهای بزرگ دارد
+            // - اگر تعداد اعضای گروه بالاست
+            // - اگر سیستم تحت فشار است
+
+            // مثال: اگر تعداد فایلها بیش از 5 باشد، در صف قرار بگیرد
+            // if (request.FileAttachementIds != null && request.FileAttachementIds.Count > 5)
+            // {
+            //     return true;
+            // }
+
+            // مثال: اگر تعداد اعضای گروه بیش از 100 نفر باشد
+            // var memberCount = request.GroupType == ConstChat.ClassGroupType
+            //     ? await _classGroupService.GetClassGroupMembersCountAsync(request.GroupId)
+            //     : await _channelService.GetChannelMembersCountAsync(request.GroupId);
+            // if (memberCount > 100)
+            // {
+            //     return true;
+            // }
+
+            return await Task.FromResult(false);
         }
 
         public async Task EditMessage(EditMessageRequestDto request)

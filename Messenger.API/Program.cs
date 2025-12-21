@@ -1,4 +1,6 @@
-﻿using Messenger.API.Helper;
+﻿using Hangfire;
+using Hangfire.SqlServer;
+using Messenger.API.Helper;
 using Messenger.API.Hubs;
 using Messenger.API.ServiceHelper;
 using Messenger.API.ServiceHelper.Interfaces; // Added for Redis service interfaces
@@ -328,6 +330,31 @@ builder.Services.AddHostedService<DeleteFileBackgroundService>();
 // background service for sync read\unread messages from Redis to SQL and vice bersa
 builder.Services.AddHostedService<UnreadMessageSyncService>();
 
+// Hangfire Configuration
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(ConnectionString, new SqlServerStorageOptions
+    {
+        CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+        SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+        QueuePollInterval = TimeSpan.Zero,
+        UseRecommendedIsolationLevel = true,
+        DisableGlobalLocks = true,
+        SchemaName = "HangfireMessenger"
+    }));
+
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 5; // تعداد worker threads
+    options.Queues = new[] { "critical", "high", "default", "low" };
+});
+
+// Register Hangfire services
+builder.Services.AddScoped<IMessageQueueService, MessageQueueService>();
+builder.Services.AddScoped<ProcessMessageJob>();
+
 builder.Services.Configure<FileConfigSetting>(builder.Configuration.GetSection("FileStorage"));
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi  
@@ -376,6 +403,13 @@ app.UseRouting();
 // 6. Authentication & Authorization: هویت کاربر را تایید و سطح دسترسی او را بررسی می‌کند.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Hangfire Dashboard
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new HangfireAuthorizationFilter() },
+    DashboardTitle = "Messenger Queue Dashboard"
+});
 
 
 app.MapOpenApi();
