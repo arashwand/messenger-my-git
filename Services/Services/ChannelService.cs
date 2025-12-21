@@ -281,7 +281,7 @@ namespace Messenger.Services.Services
 
         public async Task<IEnumerable<UserDto>> GetChannelMembersInternalAsync(long channelId)
         {
-            Console.WriteLine($"Getting members for channel {channelId}");
+            _logger.LogInformation("Getting members for channel {ChannelId}", channelId);
 
             // 1. Check if requesting user is a member of the channel
             return await ChannelMembersAsync(channelId);
@@ -292,7 +292,7 @@ namespace Messenger.Services.Services
         /// </summary>
         public async Task<int> GetChannelMembersCountAsync(long channelId)
         {
-            Console.WriteLine($"Getting member count for channel {channelId}");
+            _logger.LogInformation("Getting member count for channel {ChannelId}", channelId);
             
             try
             {
@@ -301,19 +301,19 @@ namespace Messenger.Services.Services
                     .Where(cm => cm.ChannelId == channelId)
                     .CountAsync();
 
-                Console.WriteLine($"Channel {channelId} has {count} members");
+                _logger.LogInformation("Channel {ChannelId} has {Count} members", channelId, count);
                 return count;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting member count for channel {channelId}: {ex.Message}");
+                _logger.LogError(ex, "Error getting member count for channel {ChannelId}", channelId);
                 return 0;
             }
         }
 
         private async Task<IEnumerable<UserDto>> ChannelMembersAsync(long channelId)
         {
-            Console.WriteLine($"Getting members for channel {channelId}");
+            _logger.LogInformation("Getting members for channel {ChannelId}", channelId);
 
 
             var userEntities = await _context.ChannelMembers
