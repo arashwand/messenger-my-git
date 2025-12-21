@@ -307,7 +307,7 @@ builder.Services.AddScoped<IManagePushService, ManagePushService>();
 
 // Register custom Redis services
 builder.Services.AddScoped<RedisLastMessageService>();
-builder.Services.AddScoped<IRedisUserStatusService, RedisUserStatusService>();
+builder.Services.AddSingleton<IRedisUserStatusService, RedisUserStatusService>(); // Changed to Singleton for SystemMonitorService
 builder.Services.AddSingleton<IRedisUnreadManage, RedisUnreadManage>();
 
 // Register BroadcastService
