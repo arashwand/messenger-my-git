@@ -138,19 +138,7 @@ namespace Messenger.API.ServiceHelper
                     tasks.Add(_redisUnreadManage.IncrementUnreadCountAsync(memberId, targetId, queuedMessage.GroupType));
 
                     // ارسال آپدیت تعداد unread به کاربر
-                    tasks.Add(_redisUnreadManage.GetUnreadCountAsync(memberId, targetId, queuedMessage.GroupType)
-                        .ContinueWith(async t =>
-                        {
-                            if (t.IsFaulted)
-                            {
-                                _logger.LogError(t.Exception, "Error retrieving unread count for member {MemberId}", memberId);
-                                return;
-                            }
-
-                            var unreadCount = t.Result;
-                            await _hubContext.Clients.User(memberId.ToString())
-                                .SendAsync("UpdateUnreadCount", memberId, groupKey, unreadCount);
-                        }).Unwrap());
+                    tasks.Add(UpdateUnreadCountForMemberAsync(memberId, targetId, queuedMessage.GroupType, groupKey));
 
                     // 6. ارسال Push notification برای کاربران آفلاین
                     if (!onlineUsers.Contains(memberId))
@@ -174,6 +162,24 @@ namespace Messenger.API.ServiceHelper
 
                 // در صورت خطا، Hangfire به صورت خودکار retry میکند
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// بروزرسانی شمارنده unread برای یک عضو و ارسال به کاربر
+        /// </summary>
+        private async Task UpdateUnreadCountForMemberAsync(long memberId, long targetId, string groupType, string groupKey)
+        {
+            try
+            {
+                var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(memberId, (int)targetId, groupType);
+                await _hubContext.Clients.User(memberId.ToString())
+                    .SendAsync("UpdateUnreadCount", memberId, groupKey, unreadCount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating unread count for member {MemberId}", memberId);
+                // عدم ارسال exception تا Task.WhenAll به مشکل نخورد
             }
         }
     }

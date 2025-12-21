@@ -46,8 +46,8 @@ namespace Messenger.DTOs
         public DateTime QueuedAt { get; set; }
 
         /// <summary>
-        /// اولویت پیام: 0 = Normal, 1 = High, 2 = Critical
+        /// اولویت پیام
         /// </summary>
-        public int Priority { get; set; } = 0;
+        public MessagePriority Priority { get; set; } = MessagePriority.Normal;
     }
 }

@@ -1,4 +1,5 @@
 using Hangfire;
+using Hangfire.States;
 using Messenger.DTOs;
 using Microsoft.Extensions.Logging;
 
@@ -28,9 +29,9 @@ namespace Messenger.API.ServiceHelper
         /// اضافه کردن پیام به صف با اولویت مشخص
         /// </summary>
         /// <param name="message">اطلاعات پیام</param>
-        /// <param name="priority">اولویت (0: Normal, 1: High, 2: Critical)</param>
+        /// <param name="priority">اولویت</param>
         /// <returns>شناسه Job</returns>
-        string EnqueueMessageWithPriority(QueuedMessageDto message, int priority);
+        string EnqueueMessageWithPriority(QueuedMessageDto message, MessagePriority priority);
 
         /// <summary>
         /// حذف Job از صف
@@ -72,10 +73,14 @@ namespace Messenger.API.ServiceHelper
                 // تعیین صف بر اساس اولویت
                 string queueName = GetQueueName(message.Priority);
 
-                var jobId = BackgroundJob.Enqueue<ProcessMessageJob>(
-                    job => job.ProcessAsync(message, null));
+                // استفاده از Queue attribute برای تعیین صف
+                var client = new BackgroundJobClient();
+                var jobId = client.Create<ProcessMessageJob>(
+                    job => job.ProcessAsync(message, null),
+                    new EnqueuedState(queueName));
 
-                _logger.LogInformation("Message enqueued successfully with JobId: {JobId}", jobId);
+                _logger.LogInformation("Message enqueued successfully with JobId: {JobId} in queue: {QueueName}", 
+                    jobId, queueName);
 
                 return jobId;
             }
@@ -114,7 +119,7 @@ namespace Messenger.API.ServiceHelper
         /// <summary>
         /// اضافه کردن پیام به صف با اولویت مشخص
         /// </summary>
-        public string EnqueueMessageWithPriority(QueuedMessageDto message, int priority)
+        public string EnqueueMessageWithPriority(QueuedMessageDto message, MessagePriority priority)
         {
             message.Priority = priority;
             return EnqueueMessage(message);
@@ -178,12 +183,13 @@ namespace Messenger.API.ServiceHelper
         /// <summary>
         /// تعیین نام صف بر اساس اولویت
         /// </summary>
-        private string GetQueueName(int priority)
+        private string GetQueueName(MessagePriority priority)
         {
             return priority switch
             {
-                2 => "critical",
-                1 => "high",
+                MessagePriority.Critical => "critical",
+                MessagePriority.High => "high",
+                MessagePriority.Low => "low",
                 _ => "default"
             };
         }
