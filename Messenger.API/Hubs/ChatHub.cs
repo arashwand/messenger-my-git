@@ -23,6 +23,7 @@ namespace Messenger.API.Hubs
         private readonly ILogger<ChatHub> _logger;
         private readonly PushService _pushService;
         private readonly IMessageQueueService _messageQueueService;
+        private readonly ISystemMonitorService _systemMonitor;
 
         private const string BridgeGroupName = "BRIDGE_SERVICES";
 
@@ -34,7 +35,8 @@ namespace Messenger.API.Hubs
                        RedisLastMessageService redisLastMessage,
                        IRedisUnreadManage redisUnreadManage,
                        PushService pushService,
-                       IMessageQueueService messageQueueService)
+                       IMessageQueueService messageQueueService,
+                       ISystemMonitorService systemMonitor)
         {
             _messageService = messageService;
             _classGroupService = classGroupService;
@@ -45,6 +47,7 @@ namespace Messenger.API.Hubs
             _logger = logger;
             _pushService = pushService;
             _messageQueueService = messageQueueService;
+            _systemMonitor = systemMonitor;
         }
 
         // =================== Connection lifecycle ===================
@@ -501,6 +504,16 @@ namespace Messenger.API.Hubs
         {
             try
             {
+                // فاز 3: بررسی فشار سیستم (Load Balancing) - اولویت بالا
+                // اگر سیستم تحت فشار است، همه پیامها به صف میروند
+                var isSystemUnderPressure = await _systemMonitor.IsSystemUnderPressureAsync();
+                if (isSystemUnderPressure)
+                {
+                    var loadScore = await _systemMonitor.GetSystemLoadScoreAsync();
+                    _logger.LogWarning("System under pressure (Load Score: {LoadScore:F2}), queueing message with LOW priority", loadScore);
+                    return (true, MessagePriority.Low);
+                }
+
                 // فاز 1: بررسی تعداد اعضای گروه (Canary Deployment)
                 var memberCount = request.GroupType == ConstChat.ClassGroupType
                     ? await _classGroupService.GetClassGroupMembersCountAsync(request.GroupId)
@@ -528,8 +541,7 @@ namespace Messenger.API.Hubs
                     return (true, MessagePriority.High);
                 }
 
-                // فاز 3 و 4: آماده برای افزودن در آینده
-                // - Load Balancing: بررسی فشار سیستم
+                // فاز 4: آماده برای افزودن در آینده
                 // - Scheduled Messages: پیامهای برنامهریزی شده
 
                 // پیشفرض: ارسال فوری

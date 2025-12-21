@@ -92,5 +92,36 @@ namespace Messenger.API.Services
             await _db.KeyExpireAsync(userGroupsKey, TimeSpan.FromSeconds(USER_GROUPS_CACHE_TTL_SECONDS));
         }
 
+        /// <summary>
+        /// دریافت تعداد تقریبی کل کاربران آنلاین در تمام گروهها
+        /// از کلیدهای online:* استفاده میکند
+        /// </summary>
+        public async Task<int> GetTotalOnlineUsersCountAsync()
+        {
+            try
+            {
+                var server = _db.Multiplexer.GetServer(_db.Multiplexer.GetEndPoints().First());
+                var keys = server.Keys(pattern: "online:*", pageSize: 1000);
+                
+                var uniqueUsers = new HashSet<long>();
+                
+                foreach (var key in keys)
+                {
+                    var members = await _db.SetMembersAsync(key);
+                    foreach (var member in members)
+                    {
+                        uniqueUsers.Add((long)member);
+                    }
+                }
+                
+                return uniqueUsers.Count;
+            }
+            catch (Exception)
+            {
+                // در صورت خطا، مقدار پیشفرض برمیگردانیم
+                return 0;
+            }
+        }
+
     }
 }

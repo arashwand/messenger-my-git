@@ -356,6 +356,9 @@ builder.Services.AddHangfireServer(options =>
 builder.Services.AddScoped<IMessageQueueService, MessageQueueService>();
 builder.Services.AddScoped<ProcessMessageJob>();
 
+// Register System Monitor Service for Load Balancing
+builder.Services.AddSingleton<ISystemMonitorService, SystemMonitorService>();
+
 builder.Services.Configure<FileConfigSetting>(builder.Configuration.GetSection("FileStorage"));
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi  
