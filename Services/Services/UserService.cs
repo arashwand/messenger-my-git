@@ -262,8 +262,15 @@ namespace Messenger.Services.Services
             // جستجو بر اساس نوع
             if (searchType == "nationalCode")
             {
-                // فرض: کد ملی در فیلد LoginCode ذخیره شده
-                usersQuery = usersQuery.Where(u => u.LoginCode.Contains(query));
+                // TODO: در صورتی که فیلد کد ملی به مدل User اضافه شود، از کد زیر استفاده کنید:
+                // usersQuery = usersQuery.Where(u => u.NationalCode.Contains(query));
+                
+                // فعلاً که فیلد کد ملی وجود ندارد، از جستجوی نام استفاده می‌کنیم
+                _logger.LogWarning("National code search requested but field not available in User model. Falling back to name search.");
+                usersQuery = usersQuery.Where(u => 
+                    u.NameFamily.Contains(query) || 
+                    u.DeptName.Contains(query)
+                );
             }
             else
             {
