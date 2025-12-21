@@ -73,7 +73,11 @@ namespace Messenger.API.ServiceHelper
                 {
                     _logger.LogError("Failed to save message from user {UserId} to group {GroupId}",
                         queuedMessage.UserId, queuedMessage.GroupId);
-                    throw new Exception("Failed to save message to database");
+                    throw new MessageProcessingException(
+                        "Failed to save message to database", 
+                        queuedMessage.UserId, 
+                        queuedMessage.GroupId, 
+                        queuedMessage.GroupType);
                 }
 
                 // تنظیم ClientMessageId در صورت وجود
@@ -172,7 +176,7 @@ namespace Messenger.API.ServiceHelper
         {
             try
             {
-                var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(memberId, (int)targetId, groupType);
+                var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(memberId, targetId, groupType);
                 await _hubContext.Clients.User(memberId.ToString())
                     .SendAsync("UpdateUnreadCount", memberId, groupKey, unreadCount);
             }

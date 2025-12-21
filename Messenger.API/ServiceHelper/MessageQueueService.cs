@@ -1,5 +1,4 @@
 using Hangfire;
-using Hangfire.States;
 using Messenger.DTOs;
 using Microsoft.Extensions.Logging;
 
@@ -74,10 +73,9 @@ namespace Messenger.API.ServiceHelper
                 string queueName = GetQueueName(message.Priority);
 
                 // استفاده از Queue attribute برای تعیین صف
-                var client = new BackgroundJobClient();
-                var jobId = client.Create<ProcessMessageJob>(
-                    job => job.ProcessAsync(message, null),
-                    new EnqueuedState(queueName));
+                var jobId = BackgroundJob.Enqueue<ProcessMessageJob>(
+                    queueName,
+                    job => job.ProcessAsync(message, null));
 
                 _logger.LogInformation("Message enqueued successfully with JobId: {JobId} in queue: {QueueName}", 
                     jobId, queueName);

@@ -347,8 +347,9 @@ builder.Services.AddHangfire(config => config
 
 builder.Services.AddHangfireServer(options =>
 {
-    options.WorkerCount = 5; // تعداد worker threads
-    options.Queues = new[] { "critical", "high", "default", "low" };
+    options.WorkerCount = builder.Configuration.GetValue<int>("Hangfire:WorkerCount", 5); // پیشفرض: 5
+    options.Queues = builder.Configuration.GetSection("Hangfire:Queues").Get<string[]>() 
+        ?? new[] { "critical", "high", "default", "low" };
 });
 
 // Register Hangfire services
