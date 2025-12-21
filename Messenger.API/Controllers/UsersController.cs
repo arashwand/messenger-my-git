@@ -6,20 +6,24 @@ using System.Threading.Tasks;
 using System;
 using Microsoft.AspNetCore.Authorization; // Added for [Authorize]
 using System.Security.Claims; // Added for ClaimsPrincipal
+using Messenger.Tools; // Added for ConstRoles
+using Microsoft.Extensions.Logging; // Added for logging
 
 namespace MessengerApp.WebAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize(Policy = "AdminPolicy")]
+    [Authorize]
     [ApiExplorerSettings(IgnoreApi = true)]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ILogger<UsersController> _logger;
 
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, ILogger<UsersController> logger)
         {
             _userService = userService;
+            _logger = logger;
         }
 
         // Helper to get current user ID from JWT claims
@@ -35,6 +39,13 @@ namespace MessengerApp.WebAPI.Controllers
             return 0;
         }
 
+        // Helper to get current user role from JWT claims
+        private string GetCurrentUserRole()
+        {
+            var roleClaim = User.FindFirst(ClaimTypes.Role);
+            return roleClaim?.Value ?? string.Empty;
+        }
+
 
         [HttpGet("{userId}")]
         public async Task<ActionResult<UserDto>> GetUserById(long userId)
@@ -45,14 +56,31 @@ namespace MessengerApp.WebAPI.Controllers
         }
 
         [HttpGet("search")]
+        [Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
         public async Task<ActionResult<IEnumerable<UserDto>>> SearchUsers([FromQuery] string query)
         {
-            if (string.IsNullOrWhiteSpace(query))
+            try
             {
-                return BadRequest("Search query cannot be empty.");
+                var currentUserRole = GetCurrentUserRole();
+                _logger.LogInformation("User with role {Role} is searching for users with query: {Query}", currentUserRole, query);
+
+                // Validate input: minimum 2 characters
+                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                {
+                    _logger.LogWarning("Invalid search query: {Query}", query);
+                    return BadRequest("Search query must be at least 2 characters.");
+                }
+
+                var users = await _userService.SearchUsersAsync(query);
+                _logger.LogInformation("Search completed. Found {Count} users.", users?.Count() ?? 0);
+                
+                return Ok(users);
             }
-            var users = await _userService.SearchUsersAsync(query);
-            return Ok(users);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while searching users with query: {Query}", query);
+                return StatusCode(500, "An error occurred while searching for users.");
+            }
         }
 
         // --- Blocked Users ---

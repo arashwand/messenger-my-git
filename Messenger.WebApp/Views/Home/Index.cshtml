@@ -7,7 +7,90 @@
 @using Messenger.Tools
 
 @section Styles {
+    <style>
+        /* Mobile Optimization CSS */
+        
+        /* Prevent horizontal scroll on all devices */
+       /*  body, html {
+            overflow-x: hidden;
+            max-width: 100vw;
+            position: relative;
+        } */
 
+        /* Prevent zoom on iOS when focusing input */
+        .search-input {
+            font-size: 16px !important;
+        }
+
+        /* Search container styles */
+        .search-container {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Search tabs styles */
+        .search-tabs .btn.active {
+            background: #007bff !important;
+            color: #fff !important;
+            border-color: #007bff !important;
+        }
+
+        .search-tabs .btn:not(.active) {
+            background: #fff !important;
+            color: #333 !important;
+            border-color: #ddd !important;
+        }
+
+        .search-tabs .btn:hover {
+            opacity: 0.8;
+        }
+
+        /* User result item styles */
+        .user-result-item {
+            border-bottom: 1px solid #e0e0e0;
+            transition: background-color 0.2s;
+        }
+
+        .user-result-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Responsive styles for mobile */
+        @@media (max-width: 768px) {
+            .search-container {
+                padding: 12px !important;
+            }
+
+            .search-input {
+                font-size: 16px !important;
+                padding: 10px 40px !important;
+            }
+
+            .search-tabs .btn {
+                font-size: 13px;
+                padding: 5px 12px;
+            }
+        }
+
+        /* iPhone specific fixes */
+        @@supports (-webkit-touch-callout: none) {
+            /* iOS Safari specific styles */
+            .search-input {
+                -webkit-appearance: none;
+                border-radius: 25px;
+            }
+            
+            input[type="text"] {
+                font-size: 16px !important; /* Prevent zoom */
+            }
+        }
+
+        /* Prevent text size adjustment on orientation change */
+        html {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+    </style>
 }
 
 <input type="hidden" value="@User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value" id="userId" />
@@ -16,6 +99,7 @@
 <input type="hidden" value="@(ViewData["baseUrl"] ?? "")" id="baseUrl" />
 <input type="hidden" value="" id="groupType" />
 <input type="hidden" value="@Model" id="linkToChatId" />
+<input type="hidden" value="@User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value" id="userRole" />
 
 <div id="main-page-wrapper" class="hide-on-chat-select">
 
@@ -34,7 +118,12 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-sm-3 gap-2">
-
+                    @if (User.IsInRole(ConstRoles.Manager) || User.IsInRole(ConstRoles.Personel))
+                    {
+                        <a href="#search-offcanvas" data-bs-toggle="offcanvas">
+                            <i class="iconsax icon-btn" data-icon="search-normal-2"> </i>
+                        </a>
+                    }
                     <div class="dropdown more-options dropdown-menu-end">
                         <a class="btn dropdown-toggle mt-0 p-0" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="iconsax icon-btn" data-icon="menu-meatballs"> </i>
@@ -56,9 +145,51 @@
     </header>
     <!-- header end -->
 
+    <!-- Search Section -->
+    <div class="search-container hide-on-chat-select" style="position: sticky; top: 0; z-index: 100; background: #fff; padding: 16px 12px; border-bottom: 1px solid #e0e0e0;">
+        <div class="custom-container">
+            <!-- Search Input -->
+            <div class="position-relative mb-3">
+                <input type="text" 
+                       id="chatSearchInput" 
+                       class="form-control search-input" 
+                       placeholder="جستجو در چت‌ها..."
+                       style="padding-right: 40px; padding-left: 40px; border-radius: 25px; font-size: 16px !important; border: 1px solid #ddd; background-color: #f5f5f5;">
+                <i class="iconsax position-absolute" 
+                   data-icon="search-normal" 
+                   style="left: 15px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none;"></i>
+                <button id="clearSearchBtn" 
+                        class="btn btn-link position-absolute" 
+                        style="right: 10px; top: 50%; transform: translateY(-50%); display: none; padding: 0; color: #999; font-size: 20px; line-height: 1; text-decoration: none;">
+                    ×
+                </button>
+            </div>
 
+            <!-- Search Tabs -->
+            <div class="search-tabs d-flex gap-2" style="margin-bottom: 12px;">
+                <button id="searchChatsTab" 
+                        class="btn btn-sm active" 
+                        style="border-radius: 20px; padding: 6px 16px; border: 1px solid #ddd; background: #007bff; color: #fff; transition: all 0.3s;">
+                    جستجو در چت‌ها
+                </button>
+                <button id="searchUsersTab" 
+                        class="btn btn-sm" 
+                        style="border-radius: 20px; padding: 6px 16px; border: 1px solid #ddd; background: #fff; color: #333; transition: all 0.3s; display: none;">
+                    جستجوی کاربران
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Search Section End -->
 
     <div id="main-content-body" class="hide-on-chat-select">
+
+        <!-- Search Results Container -->
+        <div id="searchResults" 
+             class="search-results" 
+             style="display: none;">
+            <!-- Search results will be dynamically inserted here -->
+        </div>
 
         <!-- chat section starts -->
         <section class="chat-section pt-0">
@@ -154,6 +285,7 @@
     <script src="~/js/modal-lightbox.js" asp-append-version="true"></script>
     <script src="~/js/mobile-layout-handler.js" asp-append-version="true"></script>
     <script src="~/js/notification.js" asp-append-version="true"></script>
+    <script src="~/js/chatSearch.js" asp-append-version="true"></script>
 
     <script>
 

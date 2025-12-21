@@ -15,6 +15,7 @@ using System.Net.Http;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 
 namespace Messenger.WebApp.Controllers
 {
@@ -29,6 +30,7 @@ namespace Messenger.WebApp.Controllers
         private readonly IRealtimeHubBridgeService _hubBridgeService;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ILogger<ChatController> _logger;
+        private readonly IUserServiceClient _userService;
         private readonly string _baseUrl;
 
         public ChatController(IRealtimeHubBridgeService hubBridgeService,
@@ -37,7 +39,8 @@ namespace Messenger.WebApp.Controllers
             IHttpContextAccessor httpContextAccessor,
             IFileManagementServiceClient fileManagementServiceClient,
             IOptions<ApiSettings> apiSettings,
-            HttpClient httpClient)
+            HttpClient httpClient,
+            IUserServiceClient userService)
         {
             _hubBridgeService = hubBridgeService;
             _logger = logger;
@@ -46,6 +49,7 @@ namespace Messenger.WebApp.Controllers
             _fileService = fileManagementServiceClient;
             _httpClient = httpClient;
             _baseUrl = apiSettings.Value.BaseUrl;
+            _userService = userService;
         }
 
         public class DownloadFileRequest { public long FileId { get; set; } }
@@ -166,6 +170,48 @@ namespace Messenger.WebApp.Controllers
             {
                 _logger.LogError(ex, "Error in GetUsersWithStatus action.");
                 return StatusCode(500, "Internal server error getting users with status.");
+            }
+        }
+
+        [HttpGet("searchUsers")]
+        [Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
+        public async Task<IActionResult> SearchUsers([FromQuery] string query)
+        {
+            try
+            {
+                // Validate input
+                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                {
+                    return BadRequest(new { success = false, message = "Search query must be at least 2 characters." });
+                }
+
+                var currentUserId = GetCurrentUserId();
+                _logger.LogInformation("User {UserId} searching for users with query: {Query}", currentUserId, query);
+
+                // Call the API to search users
+                var users = await _userService.SearchUsersAsync(query);
+
+                // Filter out the current user from results
+                var filteredUsers = users.Where(u => u.UserId != currentUserId).ToList();
+
+                _logger.LogInformation("Search completed. Found {Count} users (excluding current user).", filteredUsers.Count);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = filteredUsers,
+                    count = filteredUsers.Count
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "HTTP error occurred while searching users with query: {Query}", query);
+                return StatusCode(503, new { success = false, message = "Service temporarily unavailable." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while searching users with query: {Query}", query);
+                return StatusCode(500, new { success = false, message = "An error occurred while searching for users." });
             }
         }
 

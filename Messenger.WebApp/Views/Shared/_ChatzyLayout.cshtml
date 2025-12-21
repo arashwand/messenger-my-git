@@ -52,8 +52,22 @@
 </head>
 
 <body>
- 
+
     @RenderBody()
+
+    <!-- search offcanvas starts -->
+    <div class="offcanvas offcanvas-top search-offcanvas" tabindex="-1" id="search-offcanvas">
+        <div class="offcanvas-header">
+            <a href="setting.html" data-bs-dismiss="offcanvas">
+                <i class="iconsax icon-btn" data-icon="chevron-left"> </i>
+            </a>
+            <div class="form-input">
+                <input type="search" class="form-control search" id="inputusername" placeholder="Search here...">
+                <i class="iconsax search" data-icon="search-normal-2"> </i>
+            </div>
+        </div>
+    </div>
+
     <!-- sidebar starts -->
     <div class="offcanvas sidebar-offcanvas offcanvas-start" tabindex="-1" id="offcanvasLeft">
         <div class="offcanvas-header sidebar-header">
@@ -102,8 +116,6 @@
         </div>
     </div>
     <!-- sidebar end -->
-
-
     <!-- add story modal starts -->
     <div class="modal fade add-modal" id="add-story-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -145,7 +157,6 @@
         </div>
     </div>
     <!-- add story modal end  -->
-
     <!-- friend story modal starts -->
     <div class="modal fade story-modal" id="friend-story" tabindex="-1">
         <div class="modal-dialog modal-fullscreen">
@@ -238,8 +249,7 @@
         </div>
     </div>
     <!-- friend story modal end -->
-
-   <!--chat files modal-->
+    <!--chat files modal-->
     <div class="modal fade" id="groupFilesModal">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -253,7 +263,7 @@
             </div>
         </div>
     </div>
-    
+
     <!--notif modal-->
     <div class="modal fade" id="notif-modal" tabindex="-1" style="">
         <div class="modal-dialog modal-dialog-centered">
@@ -321,7 +331,7 @@
                         </button>
                     </div>
                     <button class="btn btn-success btn-download-image-file">
-                       
+
                         <i class="iconsax icon-btn" data-icon="download"> </i>
                         <span class="spinner-border spinner-border-sm spinner-icon" style="display:none;"></span>
                     </button>
@@ -444,7 +454,7 @@
         </div>
     </div>
 
-     <!-- Toast Container برای نمایش پیام‌های خطا و اطلاع‌رسانی -->
+    <!-- Toast Container برای نمایش پیام‌های خطا و اطلاع‌رسانی -->
     <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
     </div>
 
@@ -470,10 +480,10 @@
     <script src="~/chatzy/assets/js/bootstrap.bundle.min.js"></script>
 
     <!-- swiper js -->
-@*     <script src="~/chatzy/assets/js/swiper-bundle.min.js"></script>
+    @*     <script src="~/chatzy/assets/js/swiper-bundle.min.js"></script>
     <script src="~/chatzy/assets/js/custom-swiper.js"></script> *@
 
-    
+
     <script>
         window.VAPID_PUBLIC_KEY = "BAoXI8fA4RhnNRHLS8Onxe5VLEQJ4TXsFFyw_L2cf9_IUkVRU5Uq5wsfor9s63C331Hh97oeFNz7WcvNPPIL5BQ";
         window.userIsLoggedIn = @User.Identity.IsAuthenticated.ToString().ToLower();
@@ -481,7 +491,7 @@
 
     <!-- script js -->
     @* <script src="~/js/push.js"></script> *@
-   
+
     <script src="~/chatzy/assets/js/script.js"></script>
 
     <!-- template Setting js -->
