@@ -406,7 +406,7 @@ namespace Messenger.Services.Services
 
             if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
             {
-                if (chatType == ConstChat.ChannelGroupType)
+                if (chatType == ConstChat.ClassGroupType)
                 {
                     var isMember = await _classGroupService.IsUserMemberOfClassGroupAsync(userId, chatId);
                     if (!isMember)
@@ -1152,6 +1152,11 @@ namespace Messenger.Services.Services
             {
                 messageType = (byte)EnumMessageType.Channel;
                 messageTypeAll = 4;
+            }
+            else if (chatType == ConstChat.PrivateType)
+            {
+                messageType = (byte)EnumMessageType.Private;
+                messageTypeAll = 2; // For Private, use the same type since there's no "all private" category
             }
 
             var query = _context.Messages
@@ -2121,8 +2126,8 @@ namespace Messenger.Services.Services
 
         public async Task<int> GetUnreadCountAsync(long userId, string groupType, long targetId)
         {
-            if (groupType != ConstChat.ClassGroupType && groupType != ConstChat.ChannelGroupType)
-                throw new ArgumentException("Invalid groupType. Must be 'Group' or 'Channel'.");
+            if (groupType != ConstChat.ClassGroupType && groupType != ConstChat.ChannelGroupType && groupType != ConstChat.PrivateType)
+                throw new ArgumentException("Invalid groupType. Must be 'ClassGroup', 'ChannelGroup', or 'Private'.");
 
             // Use the new Redis method to count unread messages
             return await _redisUnreadManage.GetUnreadCountAsync(userId, targetId, groupType);
@@ -2175,10 +2180,26 @@ namespace Messenger.Services.Services
                 {
                     messageTypeByte = (byte)EnumMessageType.Channel;
                 }
+                else if (groupType == ConstChat.PrivateType)
+                {
+                    messageTypeByte = (byte)EnumMessageType.Private;
+                }
 
-                chatMessageIdsQuery = _context.Messages
-                    .Where(m => m.OwnerId == targetId && m.MessageType == messageTypeByte)
-                    .Select(m => m.MessageId);
+                // برای چت خصوصی، باید از MessagePrivates استفاده کنیم
+                if (groupType == ConstChat.PrivateType)
+                {
+                    chatMessageIdsQuery = _context.Messages
+                        .Where(m => m.MessageType == messageTypeByte && 
+                                    ((m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == targetId)) ||
+                                     (m.SenderUserId == targetId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))))
+                        .Select(m => m.MessageId);
+                }
+                else
+                {
+                    chatMessageIdsQuery = _context.Messages
+                        .Where(m => m.OwnerId == targetId && m.MessageType == messageTypeByte)
+                        .Select(m => m.MessageId);
+                }
 
 
                 // ایدی اخرین پیام خوانده شده کاربر
@@ -2227,6 +2248,15 @@ namespace Messenger.Services.Services
                     chatMessageIdsQuery = _context.Messages
                         .Where(chm => chm.OwnerId == targetId)
                         .Select(chm => chm.MessageId);
+                }
+                else if (groupType == ConstChat.PrivateType)
+                {
+                    // برای چت خصوصی، باید از MessagePrivates استفاده کنیم
+                    chatMessageIdsQuery = _context.Messages
+                        .Where(m => m.MessageType == (byte)EnumMessageType.Private && 
+                                    ((m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == targetId)) ||
+                                     (m.SenderUserId == targetId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))))
+                        .Select(m => m.MessageId);
                 }
                 else
                 {
