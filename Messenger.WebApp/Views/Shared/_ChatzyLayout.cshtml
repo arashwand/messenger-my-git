@@ -51,91 +51,7 @@
     @await RenderSectionAsync("Styles", required: false)
 
     <style>
-        /* Search Offcanvas Styles */
-        .search-offcanvas .offcanvas-header {
-            padding: 15px;
-            border-bottom: 1px solid rgba(var(--content-color), 0.15);
-        }
-
-        .search-offcanvas .form-input {
-            position: relative;
-            flex: 1;
-        }
-
-        .search-offcanvas .form-control {
-            padding-right: 40px;
-            border-radius: 25px;
-            font-size: 16px; /* جلوگیری از zoom در iOS */
-        }
-
-        .search-offcanvas .search {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-        }
-
-        .search-type-options {
-            background: rgba(var(--white), 1);
-            border-bottom: 1px solid rgba(var(--content-color), 0.15);
-        }
-
-        .form-check-input:checked {
-            background-color: rgba(var(--theme-color), 1);
-            border-color: rgba(var(--theme-color), 1);
-        }
-
-        /* نتایج جستجو */
-        .search-result-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            border-bottom: 1px solid rgba(var(--content-color), 0.1);
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .search-result-item:hover {
-            background: rgba(var(--theme-color), 0.05);
-        }
-
-        .search-result-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .search-result-info {
-            flex: 1;
-        }
-
-        .search-result-name {
-            font-weight: 600;
-            color: rgba(var(--dark-text), 1);
-            font-size: 14px;
-            margin: 0;
-        }
-
-        .search-result-role {
-            font-size: 12px;
-            color: rgba(var(--content-color), 1);
-            margin: 2px 0 0 0;
-        }
-
-        .search-loading {
-            text-align: center;
-            padding: 20px;
-            color: rgba(var(--theme-color), 1);
-        }
-
-        .search-no-results {
-            text-align: center;
-            padding: 20px;
-            color: rgba(var(--content-color), 1);
-        }
+       
     </style>
 </head>
 
@@ -144,13 +60,13 @@
     @RenderBody()
 
     <!-- search offcanvas starts -->
-    <div class="offcanvas offcanvas-top search-offcanvas" tabindex="-1" id="search-offcanvas">
+    <div class="offcanvas offcanvas-top search-offcanvas" tabindex="-1" id="search-offcanvas" style="max-width:600px; margin:0 auto;">
         <div class="offcanvas-header">
             <a href="#" data-bs-dismiss="offcanvas">
                 <i class="iconsax icon-btn" data-icon="chevron-left"></i>
             </a>
             <div class="form-input w-100">
-                <input type="search" 
+                <input type="search" dir="rtl"
                        class="form-control search" 
                        id="searchInput" 
                        placeholder="جستجو..."
@@ -160,11 +76,11 @@
         </div>
 
         <!-- دکمههای رادیویی برای Manager و Personel -->
-        <div class="offcanvas-body" id="searchOptionsContainer" style="display: none;">
+        <div class="offcanvas-body" dir="rtl" id="searchOptionsContainer" style="display: none;">
             <div class="search-type-options" style="padding: 15px;">
                 <h6 style="margin-bottom: 15px; color: rgba(var(--dark-text), 1);">جستجو بر اساس:</h6>
                 
-                <div class="form-check mb-3">
+                <span class="form-check mb-3 d-inline-block">
                     <input class="form-check-input" 
                            type="radio" 
                            name="searchType" 
@@ -174,9 +90,9 @@
                     <label class="form-check-label" for="searchByName">
                         نام و نام خانوادگی
                     </label>
-                </div>
+                </span>
 
-                <div class="form-check">
+                <span class="form-check d-inline-block">
                     <input class="form-check-input" 
                            type="radio" 
                            name="searchType" 
@@ -185,7 +101,7 @@
                     <label class="form-check-label" for="searchByNationalCode">
                         کد ملی
                     </label>
-                </div>
+                </span>
             </div>
 
             <!-- نتایج جستجو -->

@@ -8,30 +8,7 @@
 
 @section Styles {
     <style>
-        /* Mobile Optimization CSS */
         
-        /* Prevent zoom on iOS when focusing input */
-        input[type="text"],
-        input[type="search"] {
-            font-size: 16px !important; /* Prevent zoom */
-        }
-
-        /* Prevent text size adjustment on orientation change */
-        html {
-            -webkit-text-size-adjust: 100%;
-            -ms-text-size-adjust: 100%;
-            text-size-adjust: 100%;
-        }
-
-        /* iPhone specific fixes */
-        @@supports (-webkit-touch-callout: none) {
-            /* iOS Safari specific styles */
-            input[type="text"],
-            input[type="search"] {
-                -webkit-appearance: none;
-                border-radius: 25px;
-            }
-        }
     </style>
 }
 

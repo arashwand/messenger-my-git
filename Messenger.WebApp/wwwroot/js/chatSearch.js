@@ -21,6 +21,10 @@
         return document.getElementById('userRole')?.value || '';
     }
 
+    /**
+     * اگر مدیر یا پرسنل بود  مقدار مثبت میشه و میتونه سرچ بر اساس نام و کد ملی داشته باشه
+     * @returns
+     */
     function isManagerOrPersonel() {
         const role = getUserRole();
         return role === 'Manager' || role === 'Personel';
@@ -240,16 +244,19 @@
             const escapedDept = user.deptName ? ` - ${escapeHtml(user.deptName)}` : '';
             
             // avatar URL is constructed server-side, but escape for safety
-            const avatarUrl = user.profilePicName ? 
-                `${baseUrl}/uploads/thumb/1/${encodeURIComponent(user.profilePicName)}` : 
-                '/chatzy/assets/images/avatar/UserIcon.png';
+            //const avatarUrl = user.profilePicName ? 
+            //    `${baseUrl}/uploads/thumb/1/${encodeURIComponent(user.profilePicName)}` : 
+            //    '/chatzy/assets/images/avatar/UserIcon.png';
+
+
+            //<img src="${escapeHtml(avatarUrl)}"
+            //    alt="${escapedDisplayName}"
+            //    class="search-result-avatar"
+            //    onerror="this.src='/chatzy/assets/images/avatar/UserIcon.png'">
 
             html += `
                 <div class="search-result-item" data-user-id="${user.userId}" data-user-name="${escapedDisplayName}">
-                    <img src="${escapeHtml(avatarUrl)}" 
-                         alt="${escapedDisplayName}" 
-                         class="search-result-avatar" 
-                         onerror="this.src='/chatzy/assets/images/avatar/UserIcon.png'">
+                   
                     <div class="search-result-info">
                         <p class="search-result-name">${escapedDisplayName}</p>
                         <p class="search-result-role">${escapedRoleFa}${escapedDept}</p>
