@@ -1148,7 +1148,7 @@ namespace Messenger.Services.Services
             byte messageType = (byte)EnumMessageType.Group;
             byte messageTypeAll = 3;
 
-            if (chatType == ConstChat.ChannelGroup)
+            if (chatType == ConstChat.ChannelGroupType)
             {
                 messageType = (byte)EnumMessageType.Channel;
                 messageTypeAll = 4;
@@ -2171,7 +2171,7 @@ namespace Messenger.Services.Services
                 IQueryable<long> chatMessageIdsQuery;
 
                 byte messageTypeByte = (byte)EnumMessageType.Group;
-                if (groupType == ConstChat.ChannelGroup)
+                if (groupType == ConstChat.ChannelGroupType)
                 {
                     messageTypeByte = (byte)EnumMessageType.Channel;
                 }

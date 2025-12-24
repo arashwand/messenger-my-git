@@ -150,6 +150,7 @@ namespace Messenger.Services.Services
 
         /// <summary>
         /// ایجاد کاربر اگر در sso  وجود داشته باشد
+        /// ایدی را میگیرد و اطلاعات را از sso  دریافت میکنه و به دیتابیس مسنجر اضافه میکنه
         /// </summary>
         /// <param name="userId"></param>
         /// <param name="userClaims"></param>

@@ -281,7 +281,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 // ثبت سرویس SSOApi با استفاده از HttpClientFactory
 builder.Services.AddHttpClient<IUserExternalApi, UserExternalApi>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7100/");
+    client.BaseAddress = new Uri(jwtSettings.Issuer);
     //client.BaseAddress = new Uri(ssoTokenEndpoint);
 });
 

@@ -237,7 +237,7 @@ namespace Messenger.API.Controllers
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();
             var messages = await _messageService.GetReportedMessagesAsync(classId, chatType, userId, pageNumber, pageSize, scope);
-            return Ok(messages);
+            return Ok(messages.OrderByDescending(o=>o.MessageId));
         }
 
         [HttpGet("{messageId}/readstatus")]
