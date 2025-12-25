@@ -379,6 +379,20 @@ namespace Messenger.API.ServiceHelper
                     throw new InvalidOperationException("Failed to save message");
                 }
 
+                // تنظیم GroupType و GroupId قبل از ارسال
+                savedMessageDto.GroupType = request.TargetType;
+                
+                if (request.TargetType == ConstChat.PrivateType)
+                {
+                    // برای Private: groupId در Bridge محاسبه میشود - اینجا فقط metadata را تنظیم میکنیم
+                    savedMessageDto.OwnerId = request.TargetId; // receiverId
+                }
+                else
+                {
+                    // برای Group/Channel: groupId همان targetId است
+                    savedMessageDto.GroupId = request.TargetId;
+                }
+
                 // گام ۳: ارسال پیام از طریق SignalR با استفاده از HubExtensions
                 await _hubContext.SendMessageToTargetAndBridgeAsync(_logger, BridgeGroupName, request.TargetType, request.TargetId, savedMessageDto);
 
@@ -515,8 +529,19 @@ namespace Messenger.API.ServiceHelper
         {
             var privateChatGroupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderUserId, receiverUserId);
             
+            // تنظیم metadata
+            messageDto.GroupType = "Private";
+            messageDto.SenderUserId = senderUserId;
+            messageDto.OwnerId = receiverUserId;
+            
+            _logger.LogInformation($"Broadcasting private message to group {privateChatGroupKey}");
+            
             // ارسال به گروه SignalR
             await _hubContext.Clients.Group(privateChatGroupKey)
+                .SendAsync("ReceiveMessage", messageDto);
+            
+            // ارسال به Bridge
+            await _hubContext.Clients.Group(BridgeGroupName)
                 .SendAsync("ReceiveMessage", messageDto);
             
             // ذخیره‌سازی آخرین پیام در Redis

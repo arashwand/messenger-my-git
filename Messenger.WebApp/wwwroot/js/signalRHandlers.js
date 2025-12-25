@@ -18,16 +18,41 @@ window.chatSignalRHandlers = (function () {
 
         // دریافت پیام جدید
         connection.on("ReceiveMessage", function (message) {
-            console.log("Displaying message received on handler :", message);
+            console.log("📩 ReceiveMessage received:", {
+                messageId: message.messageId,
+                groupId: message.groupId,
+                groupType: message.groupType,
+                senderUserId: message.senderUserId,
+                text: message.messageText
+            });
+            
+            const currentGroupId = parseInt($('#current-group-id-hidden-input').val());
+            const currentGroupType = $('#current-group-type-hidden-input').val();
+            
+            // ✅ بررسی اینکه پیام برای چت فعلی است
+            const isForCurrentChat = (
+                message.groupId == currentGroupId && 
+                message.groupType == currentGroupType
+            );
+            
+            console.log(`📍 Is for current chat? ${isForCurrentChat} (message: ${message.groupId}/${message.groupType}, current: ${currentGroupId}/${currentGroupType})`);
+            
+            // نمایش پیام اگر از کاربر دیگری است یا پیام سیستمی است
             if (message.senderUserId !== currentUser) {
                 if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
                     window.chatUIRenderer.displayMessage(message);
+                } else {
+                    console.error("❌ chatUIRenderer.displayMessage not available");
                 }
             } else if (message.isSystemMessage) {
                 console.log("-------------------message receive from portal-------------------");
                 if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
                     window.chatUIRenderer.displayMessage(message);
+                } else {
+                    console.error("❌ chatUIRenderer.displayMessage not available");
                 }
+            } else {
+                console.log("⏭️ Skipping own message (already displayed optimistically)");
             }
         });
 
