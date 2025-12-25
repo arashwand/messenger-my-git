@@ -144,7 +144,16 @@ namespace Messenger.Services.Services
                 // اگر نقش ادمین یا پرسنل بود اجازه ارسال پیام بده
                 if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
                 {
-                    throw new Exception("User is not a member of this class group");
+                    var hasReceiveAnyMessageFromAdminOrPersonel = await _context.Messages.AnyAsync(m => m.OwnerId == user.UserId && 
+                        m.SenderUserId == chatId);
+                    if (!hasReceiveAnyMessageFromAdminOrPersonel)
+                    {
+                        throw new Exception("User is not a member of this class group");
+                    }
+                    else
+                    {
+                     // یعنی قبلا از مدیر یا ادمین پیام دریافت کرده است   
+                    }
                 }
             }
 
