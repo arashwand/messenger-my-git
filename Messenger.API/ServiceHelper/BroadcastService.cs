@@ -522,9 +522,9 @@ namespace Messenger.API.ServiceHelper
             // ذخیره آخرین پیام در Redis
             await _redisLastMessage.SetLastMessageAsync("private", privateChatGroupKey, new ChatMessageDto
             {
-                MessageText = messageDto.MessageText?.MessageTxt,
-                MessageDateTime = messageDto.MessageDateTime,
-                SenderUserName = messageDto.SenderUser?.NameFamily
+                Text = messageDto.MessageText?.MessageTxt,
+                SentAt = messageDto.MessageDateTime,
+                SenderName = messageDto.SenderUser?.NameFamily
             });
         }
 
