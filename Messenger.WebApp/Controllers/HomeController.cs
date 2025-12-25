@@ -174,6 +174,8 @@ namespace Messenger.WebApp.Controllers
             chatModel.Channels = userChannels.ToList();
             chatModel.PrivateChats = privateChats.ToList();
             
+            ViewData["baseUrl"] = _baseUrl;
+            
             return PartialView("_classGroups", chatModel);
 
         }
