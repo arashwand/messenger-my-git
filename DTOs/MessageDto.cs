@@ -37,6 +37,19 @@ public class MessageDto
     /// </summary>
     public long? ReceiverUserId { get; set; }
 
+    /// <summary>
+    /// شناسه گروه/کاربر هدف برای routing در کلاینت
+    /// - برای Group: ClassId
+    /// - برای Channel: ChannelId  
+    /// - برای Private: otherUserId (کاربر مقابل)
+    /// </summary>
+    public long GroupId { get; set; }
+    
+    /// <summary>
+    /// نوع چت: ClassGroup, ChannelGroup, Private
+    /// </summary>
+    public string? GroupType { get; set; }
+
     // Navigation properties or related DTOs can be added later if needed
     public UserDto SenderUser { get; set; } = new UserDto();
     public long? ReplyMessageId { get; set; }

@@ -27,6 +27,7 @@ namespace Messenger.WebApp.ServiceHelper
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IHubContext<WebAppChatHub> _webAppHubContext;
         private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
 
         public string ClientConnectionId => _hubConnection?.ConnectionId;
@@ -39,7 +40,9 @@ namespace Messenger.WebApp.ServiceHelper
         public HubConnectionManager(ILogger<HubConnectionManager> logger,
             IOptions<ApiSettings> apiSettings,
             IHubContext<WebAppChatHub> webAppHubContext,
-            IConfiguration configuration, IHttpClientFactory httpClientFactory)
+            IConfiguration configuration, 
+            IHttpClientFactory httpClientFactory,
+            IHttpContextAccessor httpContextAccessor)
         {
             _logger = logger;
             _hubUrl = $"{apiSettings.Value.BaseUrl.TrimEnd('/')}/chathub";
@@ -47,6 +50,7 @@ namespace Messenger.WebApp.ServiceHelper
             _httpClientFactory = httpClientFactory;
             _webAppHubContext = webAppHubContext;
             _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
             _logger.LogInformation("HubConnectionManager initialized. Hub URL: {HubUrl}", _hubUrl);
         }
 
@@ -230,8 +234,43 @@ namespace Messenger.WebApp.ServiceHelper
                         return;
                     }
 
-                    _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, Type={Type}, ReceiverUserId={Receiver}",
-                        messageDto.MessageId, messageDto.MessageType, messageDto.ReceiverUserId);
+                    _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, Type={Type}, GroupType={GroupType}, SenderId={SenderId}",
+                        messageDto.MessageId, messageDto.MessageType, messageDto.GroupType, messageDto.SenderUserId);
+
+                    // ✅ برای Private messages: محاسبه groupId از دیدگاه کاربر فعلی
+                    if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                    {
+                        var currentUserId = GetCurrentUserId();
+                        
+                        if (currentUserId <= 0)
+                        {
+                            _logger.LogWarning("Cannot determine current user ID for private message routing");
+                            // ادامه با مقادیر پیش‌فرض
+                        }
+                        else
+                        {
+                            // محاسبه otherUserId (کاربر مقابل)
+                            long otherUserId;
+                            if (messageDto.SenderUserId == currentUserId)
+                            {
+                                // من فرستندهام → نمایش در چت با گیرنده
+                                otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                            }
+                            else
+                            {
+                                // من گیرندهام → نمایش در چت با فرستنده
+                                otherUserId = messageDto.SenderUserId;
+                            }
+                            
+                            if (otherUserId > 0)
+                            {
+                                groupId = otherUserId;
+                                groupType = "Private";
+                                
+                                _logger.LogInformation($"Private message routed: currentUser={currentUserId}, otherUser={otherUserId}, groupId={groupId}");
+                            }
+                        }
+                    }
 
                     var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType);
 
@@ -292,6 +331,34 @@ namespace Messenger.WebApp.ServiceHelper
                     {
                         _logger.LogError("Invalid payload for ReceiveEditedMessage: expected 1 or 3 elements, got {Count}", payload.Length);
                         return;
+                    }
+
+                    // ✅ برای Private messages: محاسبه groupId از دیدگاه کاربر فعلی
+                    if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                    {
+                        var currentUserId = GetCurrentUserId();
+                        
+                        if (currentUserId > 0)
+                        {
+                            // محاسبه otherUserId (کاربر مقابل)
+                            long otherUserId;
+                            if (messageDto.SenderUserId == currentUserId)
+                            {
+                                // من فرستندهام → نمایش در چت با گیرنده
+                                otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                            }
+                            else
+                            {
+                                // من گیرندهام → نمایش در چت با فرستنده
+                                otherUserId = messageDto.SenderUserId;
+                            }
+                            
+                            if (otherUserId > 0)
+                            {
+                                groupId = otherUserId;
+                                groupType = "Private";
+                            }
+                        }
                     }
 
                     var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType);
@@ -972,6 +1039,32 @@ namespace Messenger.WebApp.ServiceHelper
                 return list;
             }
             return Enumerable.Empty<long>();
+        }
+
+        /// <summary>
+        /// دریافت userId کاربر فعلی از Claims
+        /// </summary>
+        private long GetCurrentUserId()
+        {
+            try
+            {
+                // فرض: userId در Claims با نام "UserId" یا "sub" ذخیره شده
+                var userIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("UserId")?.Value
+                               ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value;
+                
+                if (long.TryParse(userIdClaim, out long userId))
+                {
+                    return userId;
+                }
+                
+                _logger.LogWarning("Could not parse userId from claims");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current user ID");
+                return 0;
+            }
         }
 
         #endregion
