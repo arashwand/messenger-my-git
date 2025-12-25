@@ -107,40 +107,41 @@ namespace Messenger.Services.Services
         /// </summary>
         /// <param name="senderUserId"></param>
         /// <param name="chatId"></param>
-        /// <param name="groupType"></param>
+        /// <param name="chatType"></param>
         /// <param name="messageText"></param>
         /// <param name="fileIds"></param>
         /// <param name="replyToMessageId"></param>
         /// <param name="isPortalMessage">اگه ارسال کننده پرتال بود</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, long chatId, string groupType, string messageText,
+        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, long chatId, string chatType, string messageText,
              List<long>? fileIds = null, long? replyToMessageId = null, bool isPin = false, bool isPortalMessage = false)
         {
             _logger.LogInformation($"Attempting to send class group message from {senderUserId} to class {chatId}");
 
             // بررسی اینکه ارسال کننده عضو این گروه است یا خیر
+            //  فعلا تا تصمیم گیری نهایی این رو معلق میکنیم
             bool hasAccess = false;
-            if (isPortalMessage)
-            {
-                hasAccess = await _personnelChatAccessService.HasAccessToSendToChatAsync(senderUserId, chatId, groupType);
-            }
-            else
-            {
-                hasAccess = groupType == ConstChat.ClassGroupType ?
-               await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, chatId)
-               : await _channelService.IsUserMemberOfChannelAsync(senderUserId, chatId);
-            }
+            //if (isPortalMessage)
+            //{
+            //    hasAccess = await _personnelChatAccessService.HasAccessToSendToChatAsync(senderUserId, chatId, chatType);
+            //}
+            //else
+            //{
+            hasAccess = chatType == ConstChat.ClassGroupType ?
+           await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, chatId)
+           : await _channelService.IsUserMemberOfChannelAsync(senderUserId, chatId);
+            //}
+            // بدست اوردن نقش کاربر
+            var user = await _userService.GetUserByIdAsync(senderUserId);
 
             if (!hasAccess)
-            {
-                // بدست اوردن نقش کاربر
-                var user = await _userService.GetUserByIdAsync(senderUserId);
+            {               
                 if (user == null)
                 {
                     throw new Exception("User is not a member of this class group");
                 }
-                // اگر نقش ادمین یا مدرس بود اجازه ارسال پیام بده
+                // اگر نقش ادمین یا پرسنل بود اجازه ارسال پیام بده
                 if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
                 {
                     throw new Exception("User is not a member of this class group");
@@ -152,7 +153,13 @@ namespace Messenger.Services.Services
             try
             {
                 //تعین نوع چت
-                var chatType = groupType == ConstChat.ClassGroupType ? (byte)EnumMessageType.Group : (byte)EnumMessageType.Channel;
+                var chatTypeDetected = chatType switch
+                {
+                    ConstChat.ClassGroupType => (byte)EnumMessageType.Group,
+                    ConstChat.ChannelGroupType => (byte)EnumMessageType.Channel,
+                    ConstChat.PrivateType => (byte)EnumMessageType.Private,
+                    _ => throw new ArgumentException("Invalid chat type", nameof(chatType))
+                };
 
                 // ایجاد پیام
                 var messageEntity = new Message
@@ -160,7 +167,7 @@ namespace Messenger.Services.Services
                     OwnerId = chatId,
                     SenderUserId = senderUserId,
                     MessageDateTime = DateTime.UtcNow,
-                    MessageType = chatType,
+                    MessageType = chatTypeDetected,
                     ReplyMessageId = replyToMessageId,
                     IsPin = isPin,
                     IsSystemMessage = isPortalMessage
@@ -210,7 +217,7 @@ namespace Messenger.Services.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync(); // تأیید تراکنش
 
-                var user = await _userService.GetUserByIdAsync(senderUserId);
+                //var user = await _userService.GetUserByIdAsync(senderUserId);
                 var replyMessage = replyToMessageId != null ? await GetMessageByIdAsync(senderUserId, replyToMessageId.Value) : null;
 
                 var fileAttachments = fileIds != null ? await GetMessageFiles(messageEntity.MessageId) : null;
@@ -700,7 +707,7 @@ namespace Messenger.Services.Services
                 .Include(m => m.ReplyMessage)
                     .ThenInclude(rm => rm.SenderUser)
                 .Include(m => m.MessageFiles).ThenInclude(mf => mf.FileExtension)
-                .Where(m => m.OwnerId== channelId && m.IsHidden == false)
+                .Where(m => m.OwnerId == channelId && m.IsHidden == false)
                 .OrderByDescending(m => m.MessageDateTime)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -2098,7 +2105,7 @@ namespace Messenger.Services.Services
                 foreach (var tempPath in filesToPermanentlyDelete)
                 {
                     var originalPath = _fileManagementService.GetOriginalPathFromTemp(tempPath);
-                   await _fileManagementService.MoveFileAsync(tempPath, originalPath);
+                    await _fileManagementService.MoveFileAsync(tempPath, originalPath);
                 }
 
                 throw;
@@ -2189,7 +2196,7 @@ namespace Messenger.Services.Services
                 if (groupType == ConstChat.PrivateType)
                 {
                     chatMessageIdsQuery = _context.Messages
-                        .Where(m => m.MessageType == messageTypeByte && 
+                        .Where(m => m.MessageType == messageTypeByte &&
                                     ((m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == targetId)) ||
                                      (m.SenderUserId == targetId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))))
                         .Select(m => m.MessageId);
@@ -2253,7 +2260,7 @@ namespace Messenger.Services.Services
                 {
                     // برای چت خصوصی، باید از MessagePrivates استفاده کنیم
                     chatMessageIdsQuery = _context.Messages
-                        .Where(m => m.MessageType == (byte)EnumMessageType.Private && 
+                        .Where(m => m.MessageType == (byte)EnumMessageType.Private &&
                                     ((m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == targetId)) ||
                                      (m.SenderUserId == targetId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))))
                         .Select(m => m.MessageId);
