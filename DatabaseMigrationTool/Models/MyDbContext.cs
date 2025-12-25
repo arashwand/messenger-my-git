@@ -37,8 +37,6 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<MessageFoulReport> MessageFoulReports { get; set; }
 
-    public virtual DbSet<MessagePrivate> MessagePrivates { get; set; }
-
     public virtual DbSet<MessageRead> MessageReads { get; set; }
 
     public virtual DbSet<MessageSaved> MessageSaveds { get; set; }
@@ -271,23 +269,6 @@ public partial class MyDbContext : DbContext
             entity.HasOne(d => d.Message).WithMany(p => p.MessageFoulReports)
                 .HasForeignKey(d => d.MessageId)
                 .HasConstraintName("FK_MessageFoulReport_Messages");
-        });
-
-        modelBuilder.Entity<MessagePrivate>(entity =>
-        {
-            entity.ToTable("MessagePrivate");
-
-            entity.Property(e => e.MessagePrivateId).HasColumnName("MessagePrivateID");
-            entity.Property(e => e.GetterUserId).HasColumnName("GetterUserID");
-            entity.Property(e => e.MessageId).HasColumnName("MessageID");
-
-            entity.HasOne(d => d.GetterUser).WithMany(p => p.MessagePrivates)
-                .HasForeignKey(d => d.GetterUserId)
-                .HasConstraintName("FK_MessagePrivate_Users");
-
-            entity.HasOne(d => d.Message).WithMany(p => p.MessagePrivates)
-                .HasForeignKey(d => d.MessageId)
-                .HasConstraintName("FK_MessagePrivate_Messages");
         });
 
         modelBuilder.Entity<MessageRead>(entity =>
