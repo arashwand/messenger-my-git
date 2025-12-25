@@ -50,6 +50,14 @@ public class MessageDto
     /// </summary>
     public string? GroupType { get; set; }
 
+    /// <summary>
+    /// کلید چت برای routing در کلاینت
+    /// - Private: "private_5_10" (min_max sorted)
+    /// - ClassGroup: "ClassGroup_123"
+    /// - ChannelGroup: "ChannelGroup_456"
+    /// </summary>
+    public string? ChatKey { get; set; }
+
     // Navigation properties or related DTOs can be added later if needed
     public UserDto SenderUser { get; set; } = new UserDto();
     public long? ReplyMessageId { get; set; }

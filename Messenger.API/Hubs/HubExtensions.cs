@@ -204,6 +204,7 @@ namespace Messenger.API.Hubs
                     groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
                     
                     messageDto.GroupType = "Private";
+                    messageDto.ChatKey = groupKey;
                     // Note: groupId در Bridge تنظیم میشود چون برای هر کاربر متفاوت است
                     
                     logger.LogInformation($"Private message: sender={senderId}, receiver={receiverId}, groupKey={groupKey}");
@@ -214,6 +215,7 @@ namespace Messenger.API.Hubs
                     groupKey = GenerateSignalRGroupKey.GenerateKey((int)targetId, targetType);
                     messageDto.GroupId = targetId;
                     messageDto.GroupType = targetType;
+                    messageDto.ChatKey = groupKey;
                     
                     logger.LogInformation($"Group message: targetId={targetId}, groupKey={groupKey}");
                 }

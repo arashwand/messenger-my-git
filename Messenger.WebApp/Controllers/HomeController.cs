@@ -362,24 +362,42 @@ namespace Messenger.WebApp.Controllers
 
                 // ✅ تنظیم نام چت بر اساس نوع
                 string chatName = "چت";
+                string chatKey = "";
+                
                 if (groupType == ConstChat.PrivateType)
                 {
                     var otherUser = await _userService.GetUserByIdAsync(chatId);
                     chatName = otherUser?.NameFamily ?? "کاربر";
+                    
+                    // محاسبه chatKey برای Private
+                    if (long.TryParse(userId, out var currentUserId))
+                    {
+                        var otherUserId = (long)chatId;
+                        var minId = Math.Min(currentUserId, otherUserId);
+                        var maxId = Math.Max(currentUserId, otherUserId);
+                        chatKey = $"private_{minId}_{maxId}";
+                    }
+                    else
+                    {
+                        _logger.LogError("Invalid userId for Private chat: {UserId}", userId);
+                    }
                 }
                 else if (groupType == ConstChat.ClassGroupType)
                 {
                     var group = await _classGroupServiceClient.GetClassGroupByIdAsync(chatId);
                     chatName = group?.LevelName ?? "گروه";
+                    chatKey = $"ClassGroup_{chatId}";
                 }
                 else if (groupType == ConstChat.ChannelGroupType)
                 {
                     var channel = await _channelServiceClient.GetChannelByIdAsync(chatId);
                     chatName = channel?.ChannelName ?? "کانال";
+                    chatKey = $"ChannelGroup_{chatId}";
                 }
 
                 ViewData["chatGroupId"] = chatId;
                 ViewData["chatName"] = chatName; // ✅ اضافه شد
+                ViewData["chatKey"] = chatKey; // ✅ اضافه شد
                 ViewData["baseUrl"] = _baseUrl;
                 ViewData["chatType"] = groupType;
 
