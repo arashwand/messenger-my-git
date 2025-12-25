@@ -48,7 +48,9 @@ public static class PrivateChatHelper
     /// <summary>
     /// تولید کلید گروه نقش
     /// </summary>
-    public static string GenerateRoleGroupKey(string roleName)
+    /// <param name="roleName">نام نقش کاربر</param>
+    /// <returns>کلید گروه نقش یا null برای نقش‌های بدون گروه (مانند Mentor و SystemBot)</returns>
+    public static string? GenerateRoleGroupKey(string roleName)
     {
         return roleName switch
         {
@@ -56,7 +58,7 @@ public static class PrivateChatHelper
             ConstRoles.Teacher => "role_teachers",
             ConstRoles.Personel => "role_personnel",
             ConstRoles.Manager => "role_managers",
-            _ => null
+            _ => null // سایر نقش‌ها (مانند Mentor و SystemBot) گروه ندارند
         };
     }
 }

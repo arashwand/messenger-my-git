@@ -466,6 +466,14 @@
                  // ✅ برای Private: ایجاد groupKey با الگوی private_min_max
                  const currentUserId = parseInt($('#userId').val());
                  const otherUserId = parseInt(chatId);
+                 
+                 // اعتبارسنجی مقادیر پارس شده
+                 if (isNaN(currentUserId) || isNaN(otherUserId) || currentUserId <= 0 || otherUserId <= 0) {
+                     console.error('Invalid user IDs for private chat:', currentUserId, otherUserId);
+                     window.chatUIRenderer.showToast("❌ خطا در شناسایی کاربران", "error");
+                     return;
+                 }
+                 
                  const minId = Math.min(currentUserId, otherUserId);
                  const maxId = Math.max(currentUserId, otherUserId);
                  selectedChatId = `private_${minId}_${maxId}`;

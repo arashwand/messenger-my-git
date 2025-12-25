@@ -519,7 +519,7 @@ namespace Messenger.API.ServiceHelper
             await _hubContext.Clients.Group(privateChatGroupKey)
                 .SendAsync("ReceiveMessage", messageDto);
             
-            // ذخیره آخرین پیام در Redis
+            // ذخیره‌سازی آخرین پیام در Redis
             await _redisLastMessage.SetLastMessageAsync("private", privateChatGroupKey, new ChatMessageDto
             {
                 Text = messageDto.MessageText?.MessageTxt,
