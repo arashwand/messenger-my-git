@@ -242,6 +242,10 @@ namespace Messenger.Services.Services
                     ReplyMessageId = replyToMessageId,
                     OwnerId = chatId,
                     IsSystemMessage = isPortalMessage,
+                    
+                    // ✅ اضافه کردن ReceiverUserId برای Private messages
+                    ReceiverUserId = (chatType == ConstChat.PrivateType) ? chatId : null,
+                    
                     MessageText = messageTextEntity != null ? new MessageTextDto
                     {
                         MessageTextId = messageTextEntity.MessageTextId,
