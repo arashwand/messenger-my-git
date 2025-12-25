@@ -379,17 +379,40 @@ namespace Messenger.API.ServiceHelper
                     throw new InvalidOperationException("Failed to save message");
                 }
 
-                // تنظیم GroupType و GroupId قبل از ارسال
+                // تنظیم GroupType و ChatKey قبل از ارسال
                 savedMessageDto.GroupType = request.TargetType;
                 
                 if (request.TargetType == ConstChat.PrivateType)
                 {
-                    // برای Private: groupId در Bridge محاسبه میشود - اینجا فقط metadata را تنظیم میکنیم
-                    savedMessageDto.OwnerId = request.TargetId; // receiverId
+                    // برای Private: استفاده از PrivateChatHelper برای تولید ChatKey
+                    var senderId = savedMessageDto.SenderUserId;
+                    var receiverId = request.TargetId;
+                    
+                    savedMessageDto.ChatKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
+                    savedMessageDto.OwnerId = receiverId;
+                    savedMessageDto.GroupId = receiverId; // backward compatibility
+                    
+                    _logger.LogInformation($"Private message ChatKey: {savedMessageDto.ChatKey}");
+                }
+                else if (request.TargetType == ConstChat.ClassGroupType)
+                {
+                    // برای Group
+                    savedMessageDto.ChatKey = $"ClassGroup_{request.TargetId}";
+                    savedMessageDto.GroupId = request.TargetId;
+                    
+                    _logger.LogInformation($"Group message ChatKey: {savedMessageDto.ChatKey}");
+                }
+                else if (request.TargetType == ConstChat.ChannelGroupType)
+                {
+                    // برای Channel
+                    savedMessageDto.ChatKey = $"ChannelGroup_{request.TargetId}";
+                    savedMessageDto.GroupId = request.TargetId;
+                    
+                    _logger.LogInformation($"Channel message ChatKey: {savedMessageDto.ChatKey}");
                 }
                 else
                 {
-                    // برای Group/Channel: groupId همان targetId است
+                    // برای سایر انواع، فقط groupId را تنظیم کن
                     savedMessageDto.GroupId = request.TargetId;
                 }
 

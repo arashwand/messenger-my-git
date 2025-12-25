@@ -203,19 +203,23 @@ namespace Messenger.API.Hubs
                     var receiverId = messageDto.OwnerId > 0 ? messageDto.OwnerId : targetId;
                     groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
                     
+                    // تنظیم ChatKey و GroupType
+                    messageDto.ChatKey = groupKey;
                     messageDto.GroupType = "Private";
-                    // Note: groupId در Bridge تنظیم میشود چون برای هر کاربر متفاوت است
                     
-                    logger.LogInformation($"Private message: sender={senderId}, receiver={receiverId}, groupKey={groupKey}");
+                    logger.LogInformation($"Private message: sender={senderId}, receiver={receiverId}, chatKey={messageDto.ChatKey}");
                 }
                 else if (targetType == ConstChat.ClassGroupType || targetType == ConstChat.ChannelGroupType)
                 {
                     // برای Group/Channel
                     groupKey = GenerateSignalRGroupKey.GenerateKey((int)targetId, targetType);
+                    
+                    // تنظیم ChatKey
+                    messageDto.ChatKey = groupKey;
                     messageDto.GroupId = targetId;
                     messageDto.GroupType = targetType;
                     
-                    logger.LogInformation($"Group message: targetId={targetId}, groupKey={groupKey}");
+                    logger.LogInformation($"Group/Channel message: targetId={targetId}, chatKey={messageDto.ChatKey}");
                 }
                 else
                 {
@@ -231,7 +235,7 @@ namespace Messenger.API.Hubs
                 await hubContext.Clients.Group(bridgeGroupName)
                     .SendAsync("ReceiveMessage", messageDto);
                     
-                logger.LogInformation($"Message sent to group {groupKey} and bridge");
+                logger.LogInformation($"Message sent to group {groupKey} and bridge with ChatKey={messageDto.ChatKey}");
             }
             catch (Exception ex)
             {

@@ -20,22 +20,29 @@ window.chatSignalRHandlers = (function () {
         connection.on("ReceiveMessage", function (message) {
             console.log("📩 ReceiveMessage received:", {
                 messageId: message.messageId,
+                chatKey: message.chatKey,
                 groupId: message.groupId,
                 groupType: message.groupType,
                 senderUserId: message.senderUserId,
                 text: message.messageText
             });
             
-            const currentGroupId = parseInt($('#current-group-id-hidden-input').val());
-            const currentGroupType = $('#current-group-type-hidden-input').val();
+            // ✅ استفاده از chatKey برای مقایسه
+            const activeGroupId = window.activeGroupId; // مثلاً "private_5_10" یا "ClassGroup_123"
             
-            // ✅ بررسی اینکه پیام برای چت فعلی است
-            const isForCurrentChat = (
-                message.groupId == currentGroupId && 
-                message.groupType == currentGroupType
-            );
-            
-            console.log(`📍 Is for current chat? ${isForCurrentChat} (message: ${message.groupId}/${message.groupType}, current: ${currentGroupId}/${currentGroupType})`);
+            // بررسی اینکه پیام برای چت فعلی است
+            let isForCurrentChat = false;
+            if (message.chatKey) {
+                // اگر ChatKey موجود است، از آن استفاده کن
+                isForCurrentChat = (message.chatKey === activeGroupId);
+                console.log(`📍 ChatKey comparison: message.chatKey="${message.chatKey}", activeGroupId="${activeGroupId}", match=${isForCurrentChat}`);
+            } else {
+                // backward compatibility: استفاده از groupId و groupType
+                const currentGroupId = parseInt($('#current-group-id-hidden-input').val());
+                const currentGroupType = $('#current-group-type-hidden-input').val();
+                isForCurrentChat = (message.groupId == currentGroupId && message.groupType == currentGroupType);
+                console.log(`📍 Fallback comparison: message(${message.groupId}/${message.groupType}) vs current(${currentGroupId}/${currentGroupType}), match=${isForCurrentChat}`);
+            }
             
             // نمایش پیام اگر از کاربر دیگری است یا پیام سیستمی است
             if (message.senderUserId !== currentUser) {
