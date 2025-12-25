@@ -112,6 +112,43 @@ window.chatMessageManager = (function ($) {
     }
 
     /**
+     * ایجاد پیکربندی AJAX بر اساس نوع چت (Private یا Group/Channel)
+     */
+    function createAjaxConfigForMessages(messageId, isLoadingOlder) {
+        const chatId = parseInt($('#current-group-id-hidden-input').val());
+        const currentGroupType = $('#current-group-type-hidden-input').val();
+        const chatKey = $('#chatKey').val();
+
+        if (currentGroupType === 'Private') {
+            if (!chatKey) {
+                console.error('chatKey not found for private chat');
+                return null;
+            }
+            return {
+                url: isLoadingOlder ? '/Home/GetOlderPrivateChatMessages' : '/Home/GetNewerPrivateChatMessages',
+                type: 'GET',
+                data: {
+                    chatKey: chatKey,
+                    messageId: messageId,
+                    pageSize: 50
+                }
+            };
+        } else {
+            return {
+                url: isLoadingOlder ? '/Home/GetOldMessage' : '/Home/GetNewerMessages',
+                type: isLoadingOlder ? 'POST' : 'GET',
+                data: {
+                    chatId: chatId,
+                    groupType: currentGroupType,
+                    messageId: messageId,
+                    pageSize: 50,
+                    ...(isLoadingOlder && { loadOlder: true, loadBothDirections: false })
+                }
+            };
+        }
+    }
+
+    /**
      * پیام‌های جدیدتر از یک شناسه مشخص را بارگذاری می‌کند (برای پر کردن خلا).
      */
     function getNewerData(startMessageId) {
@@ -123,38 +160,11 @@ window.chatMessageManager = (function ($) {
         console.log(`Fetching newer messages starting after ID: ${startMessageId}`);
         getNewerDataRunning = true;
 
-        const chatId = parseInt($('#current-group-id-hidden-input').val());
-        const currentGroupType = $('#current-group-type-hidden-input').val();
-        const chatKey = $('#chatKey').val();
-
-        // تعیین URL و پارامترها بر اساس نوع چت
-        let ajaxConfig;
-        if (currentGroupType === 'Private') {
-            if (!chatKey) {
-                console.error('chatKey not found for private chat');
-                getNewerDataRunning = false;
-                return Promise.resolve();
-            }
-            ajaxConfig = {
-                url: '/Home/GetNewerPrivateChatMessages',
-                type: 'GET',
-                data: {
-                    chatKey: chatKey,
-                    messageId: startMessageId,
-                    pageSize: 50
-                }
-            };
-        } else {
-            ajaxConfig = {
-                url: '/Home/GetNewerMessages',
-                type: 'GET',
-                data: {
-                    chatId: chatId,
-                    groupType: currentGroupType,
-                    messageId: startMessageId,
-                    pageSize: 50
-                }
-            };
+        // استفاده از تابع کمکی برای ایجاد پیکربندی
+        const ajaxConfig = createAjaxConfigForMessages(startMessageId, false);
+        if (!ajaxConfig) {
+            getNewerDataRunning = false;
+            return Promise.resolve();
         }
 
         return $.ajax({
@@ -300,39 +310,12 @@ window.chatMessageManager = (function ($) {
         }
 
         console.log('last messageId is :' + lastmessageId);
-        const chatId = parseInt($('#current-group-id-hidden-input').val());
-        const currentGroupType = $('#current-group-type-hidden-input').val();
-        const chatKey = $('#chatKey').val();
 
-        // تعیین URL و پارامترها بر اساس نوع چت
-        let ajaxConfig;
-        if (currentGroupType === 'Private') {
-            if (!chatKey) {
-                console.error('chatKey not found for private chat');
-                getOldDataRunning = false;
-                return Promise.resolve();
-            }
-            ajaxConfig = {
-                url: '/Home/GetOlderPrivateChatMessages',
-                type: 'GET',
-                data: {
-                    chatKey: chatKey,
-                    messageId: lastmessageId,
-                    pageSize: 50
-                }
-            };
-        } else {
-            ajaxConfig = {
-                url: '/Home/GetOldMessage',
-                type: 'POST',
-                data: {
-                    chatId: chatId,
-                    groupType: currentGroupType,
-                    messageId: lastmessageId,
-                    loadOlder: true,
-                    loadBothDirections: false
-                }
-            };
+        // استفاده از تابع کمکی برای ایجاد پیکربندی
+        const ajaxConfig = createAjaxConfigForMessages(lastmessageId, true);
+        if (!ajaxConfig) {
+            getOldDataRunning = false;
+            return Promise.resolve();
         }
 
         return $.ajax({
