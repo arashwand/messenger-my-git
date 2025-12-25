@@ -31,8 +31,8 @@
 {
     foreach (var item in privateChats)
     {
-        <li id="@item.ChatKey">
-            <a class="chat-list-box" onclick="GetPrivateChatMessages('@item.ChatKey', '@item.ChatName', @item.LastMessage?.MessageId ?? 0)" style="cursor: pointer;">
+        <li id="private_@item.ChatId">
+            <a class="chat-list-box" onclick="GetPrivateChatMessages(@item.ChatId, '@item.ChatName', @(item.LastMessage?.MessageId ?? 0))" style="cursor: pointer;">
                 <div class="chat-list-image">
                     @if (item.ProfilePicName == "system_icon")
                     {
@@ -50,18 +50,18 @@
                 <div class="chat-details">
                     <div class="d-flex align-items-center justify-content-between">
                         <h5 class="name">@item.ChatName</h5>
-                        <h6 id="chatTime_@item.ChatKey">@item.LastMessage?.SentAt.ToString("hh:mm")</h6>
+                        <h6 id="chatTime_private_@item.ChatId">@item.LastMessage?.SentAt.ToString("hh:mm")</h6>
                     </div>
                     <div class="content">
                         <div class="d-flex align-items-center justify-content-between gap-2">
-                            <p dir="rtl" class="text-truncate is-rtl" id="chatText_@item.ChatKey">
+                            <p dir="rtl" class="text-truncate is-rtl" id="chatText_private_@item.ChatId">
                                 @if (item.LastMessage != null)
                                 {
                                     <span>@item.LastMessage?.SenderName:</span>
                                     @item.LastMessage?.Text
                                 }
                             </p>
-                            <div class="count @(item.UnreadCount == 0 ? "d-none" : "")" id="unreadCountBadge_@item.ChatKey">
+                            <div class="count @(item.UnreadCount == 0 ? "d-none" : "")" id="unreadCountBadge_private_@item.ChatId">
                                 @item.UnreadCount
                             </div>
                         </div>

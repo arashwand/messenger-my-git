@@ -341,47 +341,11 @@
             };
 
             // When a private chat is selected
-            window.GetPrivateChatMessages = function(chatKey, chatName, lastReadMessageId) {
-                console.log(`Loading private chat: ${chatKey}, name: ${chatName}`);
+            window.GetPrivateChatMessages = function(otherUserId, chatName, lastReadMessageId) {
+                console.log(`Loading private chat with user ${otherUserId}, name: ${chatName}`);
                 
-                // Activate chat (similar to ChatActivated for groups)
-                ChatActivated(chatKey, 'Private');
-                
-                $.ajax({
-                    url: '/Home/GetPrivateChatMessages',
-                    type: 'GET',
-                    data: { chatKey: chatKey, pageNumber: 1, pageSize: 50 },
-                    success: function (data) {
-                        $('#chat-details-panel').html(data).addClass('visible');
-                        
-                        // Push to URL history
-                        try { 
-                            pushChatToUrl('Private', chatKey); 
-                        } catch (e) { 
-                            console.error(e); 
-                        }
-                        
-                        // Re-attach scroll listener for pagination
-                        window.chatApp.reAttachScrollListener();
-                        
-                        // Set chat title
-                        $('.groupName').text(chatName);
-                        
-                        // Hide main elements
-                        $('.hide-on-chat-select').addClass('slide-out');
-                        
-                        // Re-initialize icons
-                        if (typeof init_iconsax === 'function') {
-                            init_iconsax();
-                        }
-                    },
-                    error: function (error) {
-                        console.error("Error loading private chat:", error);
-                        if (typeof window.chatUIRenderer !== 'undefined' && typeof window.chatUIRenderer.showToast === 'function') {
-                            window.chatUIRenderer.showToast("❌ خطا در بارگذاری چت", "error");
-                        }
-                    }
-                });
+                // Use the existing GetSelectedChatMessages function for Private chats
+                GetSelectedChatMessages(otherUserId, 'Private', lastReadMessageId || 0);
             };
 
             // When closing the chat view to go back to the list
