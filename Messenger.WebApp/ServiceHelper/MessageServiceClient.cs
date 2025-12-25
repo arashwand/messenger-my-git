@@ -306,5 +306,37 @@ namespace Messenger.WebApp.ServiceHelper
         //    response.EnsureSuccessStatusCode();
         //    return await response.Content.ReadFromJsonAsync<MessageDto>();
         //}
+
+        // Private Chats & System Messages
+        public async Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("api/messages/private-chats");
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<IEnumerable<PrivateChatItemDto>>() ?? new List<PrivateChatItemDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching private chats for user {userId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(string chatKey, int pageNumber, int pageSize, long messageId, bool loadOlder)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync(
+                    $"api/messages/private-chat/{chatKey}?pageNumber={pageNumber}&pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}");
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<IEnumerable<MessageDto>>() ?? new List<MessageDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching private chat messages for chatKey {chatKey}", chatKey);
+                throw;
+            }
+        }
     }
 }

@@ -455,6 +455,58 @@ namespace Messenger.API.Controllers
         //        return BadRequest(ex.Message);
         //    }
         //}
+
+        /// <summary>
+        /// Get list of private chats for the current user
+        /// </summary>
+        [HttpGet("private-chats")]
+        public async Task<ActionResult<IEnumerable<PrivateChatItemDto>>> GetPrivateChats()
+        {
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+
+            try
+            {
+                var privateChats = await _messageService.GetUserPrivateChatsAsync(userId);
+                return Ok(privateChats);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting private chats for user {UserId}", userId);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while retrieving private chats.");
+            }
+        }
+
+        /// <summary>
+        /// Get messages for a specific private chat
+        /// </summary>
+        /// <param name="chatKey">Chat key in format: private_{userId} or systemchat_{userId}</param>
+        /// <param name="pageNumber">Page number</param>
+        /// <param name="pageSize">Page size</param>
+        /// <param name="messageId">Message ID for pagination</param>
+        /// <param name="loadOlder">Load older messages</param>
+        [HttpGet("private-chat/{chatKey}")]
+        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateChatMessages(
+            string chatKey,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 50,
+            [FromQuery] long messageId = 0,
+            [FromQuery] bool loadOlder = false)
+        {
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+
+            try
+            {
+                var messages = await _messageService.GetPrivateChatMessagesAsync(userId, chatKey, pageNumber, pageSize, messageId, loadOlder);
+                return Ok(messages);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting private chat messages for user {UserId}, chatKey {ChatKey}", userId, chatKey);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while retrieving private chat messages.");
+            }
+        }
     }
 }
 

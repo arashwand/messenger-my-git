@@ -91,6 +91,10 @@ namespace Messenger.Services.Interfaces
         Task<int> GetUnreadCountAsync(long userId, string groupType, long targetId);
         Task<List<UnreadMessageDto>> GetAllUnreadMessageInChat(long userId, long targetId, string groupType);
         Task<int> CalculateUnreadCountFromSqlAsync(long userId, long targetId, string groupType);
+
+        // Private Chats & System Messages
+        Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
+        Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long userId, string chatKey, int pageNumber, int pageSize, long messageId = 0, bool loadOlder = false);
     }
 }
 
