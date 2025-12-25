@@ -26,6 +26,8 @@ window.chatSignalRHandlers = (function () {
                 senderUserId: message.senderUserId,
                 text: message.messageText
             });
+
+            console.log("ChatKey in message:", message.chatKey); 
             
             // ✅ دریافت چت فعلی
             const activeChatKey = window.activeGroupId; // مثلاً "private_5_10" یا "ClassGroup_123"

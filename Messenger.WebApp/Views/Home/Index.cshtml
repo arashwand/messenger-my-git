@@ -174,11 +174,25 @@
 
         function pushChatToUrl(groupType, chatId) {
             try {
+                let chatParam;
+
+                if (groupType === 'Private') {
+                    // برای چت خصوصی، باید chatKey کامل را بسازیم
+                    const currentUserId = parseInt($('#userId').val());
+                    const otherUserId = parseInt(chatId);
+                    const minId = Math.min(currentUserId, otherUserId);
+                    const maxId = Math.max(currentUserId, otherUserId);
+                    chatParam = `private_${minId}_${maxId}`;
+                } else {
+                    chatParam = `${groupType}_${chatId}`;
+                }
+
                 const url = new URL(window.location.href);
-                const value = `${groupType}_${chatId}`;
-                url.searchParams.set('chat', value);
-                history.pushState({ chat: value }, '', url.toString());
-            } catch (e) { console.error(e); }
+                url.searchParams.set('chat', chatParam);
+                window.history.pushState({ chat: chatParam }, '', url);
+            } catch (e) {
+                console.error('pushChatToUrl error:', e);
+            }
         }
 
         function replaceRemoveChatFromUrl() {
@@ -453,57 +467,53 @@
         var chatSelectedTitle = "";
 
         function ChatActivated(chatId, groupType) {
-             console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
-             var selectedChat = $(`#${groupType}_${chatId}`);
+            console.log(`chat Id and group type is :  ${chatId} and ${groupType}`);
+            var selectedChat = $(`#${groupType}_${chatId}`);
 
-             chatSelectedTitle = selectedChat.find('.name').text();
-             console.log('---------------------------------------------------------------------------------' + chatSelectedTitle);
+            chatSelectedTitle = selectedChat.find('.name').text();
+            console.log('---------------------------------------------------------------------------------' + chatSelectedTitle);
 
+            // ✅ ساخت صحیح selectedChatId برای چت خصوصی
+            let selectedChatId;
 
-             let selectedChatId;
-             
-             if (groupType === 'Private') {
-                 // ✅ برای Private: ایجاد groupKey با الگوی private_min_max
-                 const currentUserId = parseInt($('#userId').val());
-                 const otherUserId = parseInt(chatId);
-                 
-                 // اعتبارسنجی مقادیر پارس شده
-                 if (isNaN(currentUserId) || isNaN(otherUserId) || currentUserId <= 0 || otherUserId <= 0) {
-                     console.error('Invalid user IDs for private chat:', currentUserId, otherUserId);
-                     window.chatUIRenderer.showToast("❌ خطا در شناسایی کاربران", "error");
-                     return;
-                 }
-                 
-                 const minId = Math.min(currentUserId, otherUserId);
-                 const maxId = Math.max(currentUserId, otherUserId);
-                 selectedChatId = `private_${minId}_${maxId}`;
-             } else {
-                 selectedChatId = `${groupType}_${chatId}`;
-             }
-             
-             if(selectedChat.length) {
-                 const chatItemsBody = $('#chatContactTab');
-                 const chatItems = chatItemsBody.find('.active');
-                 chatItems.removeClass('active');
-                 selectedChat.addClass('active');
+            if (groupType === 'Private') {
+                // برای چت خصوصی، باید از هر دو userId استفاده کنیم
+                const currentUserId = parseInt($('#userId').val());
+                const otherUserId = parseInt(chatId);
 
-                 if (window.chatApp && window.chatApp.connection) {
+                // مرتب‌سازی برای ساخت کلید یکتا
+                const minId = Math.min(currentUserId, otherUserId);
+                const maxId = Math.max(currentUserId, otherUserId);
+
+                selectedChatId = `private_${minId}_${maxId}`;
+                console.log(`✅ Private chat ID generated: ${selectedChatId}`);
+            } else {
+                // برای گروه‌ها و کانال‌ها
+                selectedChatId = `${groupType}_${chatId}`;
+            }
+
+            if(selectedChat.length) {
+                const chatItemsBody = $('#chatContactTab');
+                const chatItems = chatItemsBody.find('. active');
+                chatItems.removeClass('active');
+                selectedChat.addClass('active');
+
+                if (window.chatApp && window.chatApp.connection) {
                     if (window.activeGroupId) {
                         window.chatApp.connection.invoke("LeaveGroup", window.activeGroupId)
-                            //.catch(err => console.error('Error leaving group:', err));
-                             .catch(err => {
-                                 console.error('Error leaving group:', err);
-                                 window.chatUIRenderer.showToast("❌ خطا در ترک چت", "error");
-                             });
+                            .catch(err => {
+                                console.error('Error leaving group:', err);
+                                window.chatUIRenderer.showToast("❌ خطا در ترک چت", "error");
+                            });
                     }
                     window.chatApp.connection.invoke("JoinGroup", selectedChatId)
-                        .catch(err =>{ 
+                        .catch(err =>{
                             console.error('Error joining group:', err);
                             window.chatUIRenderer.showToast("❌ خطا در پیوستن به چت", "error");
                         });
-                 }
-                 window.activeGroupId = selectedChatId;
-             }
+                }
+                window.activeGroupId = selectedChatId;
+            }
         }
 
         window.GetChatDetails = function(chatId, groupType){

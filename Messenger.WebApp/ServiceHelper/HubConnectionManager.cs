@@ -303,12 +303,13 @@ namespace Messenger.WebApp.ServiceHelper
                         }
                     }
 
-                    var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType);
+                    var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType,chatKey);
 
                     // ✅ ارسال به گروه با استفاده از chatKey
                     if (!string.IsNullOrEmpty(chatKey))
                     {
-                        await _webAppHubContext.Clients.Group(chatKey).SendAsync("ReceiveMessage", payload2);
+                        await _webAppHubContext.Clients.All.SendAsync("ReceiveMessage", payload2);
+                       // await _webAppHubContext.Clients.Group(chatKey).SendAsync("ReceiveMessage", payload2);
                         _logger.LogInformation($"Message forwarded to WebApp group: {chatKey}");
                     }
                     else if (messageDto.MessageType == (byte)EnumMessageType.Private && messageDto.ReceiverUserId.HasValue)
@@ -841,7 +842,7 @@ namespace Messenger.WebApp.ServiceHelper
         /// <param name="groupId">شناسه گروه</param>
         /// <param name="groupType">نوع گروه</param>
         /// <returns>شیء payload برای ارسال</returns>
-        private object CreateReceiveMessagePayload(MessageDto messageDto, long groupId, string groupType)
+        private object CreateReceiveMessagePayload(MessageDto messageDto, long groupId, string groupType, string chatKey = null)
         {
             object replyMessage = null;
             if (messageDto.ReplyMessageId != null && messageDto.ReplyMessage != null)
@@ -876,6 +877,7 @@ namespace Messenger.WebApp.ServiceHelper
                 messageText = messageDto.MessageText?.MessageTxt ?? "",
                 groupId = groupId,
                 groupType = groupType,
+                chatKey = chatKey,
                 messageDateTime = messageDto.MessageDateTime.ToString("HH:mm"),
                 messageDate = messageDto.MessageDateTime,
                 profilePicName = messageDto.SenderUser?.ProfilePicName,
