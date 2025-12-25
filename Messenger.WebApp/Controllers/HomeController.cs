@@ -622,11 +622,6 @@ namespace Messenger.WebApp.Controllers
                     return BadRequest("User ID not found in claims.");
                 }
 
-                if (!long.TryParse(userId, out long userIdLong))
-                {
-                    return BadRequest("Invalid User ID.");
-                }
-
                 _logger.LogInformation($"GetPrivateChatMessages: Loading initial messages for chatKey {chatKey}");
 
                 // دریافت پیامهای اولیه
@@ -705,11 +700,6 @@ namespace Messenger.WebApp.Controllers
                     return Json(new { success = false, message = "User ID not found in claims." });
                 }
 
-                if (!long.TryParse(userId, out long userIdLong))
-                {
-                    return Json(new { success = false, message = "Invalid User ID." });
-                }
-
                 if (messageId <= 0)
                 {
                     return Json(new { success = false, message = "Valid messageId is required." });
@@ -758,11 +748,6 @@ namespace Messenger.WebApp.Controllers
                 if (string.IsNullOrEmpty(userId))
                 {
                     return Json(new { success = false, message = "User ID not found in claims." });
-                }
-
-                if (!long.TryParse(userId, out long userIdLong))
-                {
-                    return Json(new { success = false, message = "Invalid User ID." });
                 }
 
                 if (messageId <= 0)
