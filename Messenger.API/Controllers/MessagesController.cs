@@ -482,31 +482,6 @@ namespace Messenger.API.Controllers
         /// </summary>
         /// <param name="chatKey">Chat key in format: private_{userId} or systemchat_{userId}</param>
         /// <param name="pageNumber">Page number</param>
-        /// <param name="pageSize">Page size</param>
-        /// <param name="messageId">Message ID for pagination</param>
-        /// <param name="loadOlder">Load older messages</param>
-        [HttpGet("private-chat/{chatKey}")]
-        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateChatMessages(
-            string chatKey,
-            [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 50,
-            [FromQuery] long messageId = 0,
-            [FromQuery] bool loadOlder = false)
-        {
-            var userId = GetCurrentUserId();
-            if (userId <= 0) return Unauthorized();
-
-            try
-            {
-                var messages = await _messageService.GetPrivateChatMessagesAsync(userId, chatKey, pageNumber, pageSize, messageId, loadOlder);
-                return Ok(messages);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting private chat messages for user {UserId}, chatKey {ChatKey}", userId, chatKey);
-                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while retrieving private chat messages.");
-            }
-        }
     }
 }
 
