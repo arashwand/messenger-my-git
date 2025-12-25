@@ -19,6 +19,10 @@
             chatGroupId = groupId;
         }
     }
+    
+    // دریافت chatKey برای چت‌های خصوصی
+    var chatKey = ViewData["chatKey"]?.ToString() ?? "";
+    
     string[] AllowedImages = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"];
     if (ViewData.ContainsKey("allowedImagesExtention"))
     {
@@ -93,6 +97,7 @@
    
 </style>
 
+<input type="hidden" id="chatKey" value="@chatKey" />
 <input type="hidden" id="current-group-id-hidden-input" value="@chatGroupId" />
 <input type="hidden" id="current-group-type-hidden-input" value="@chatType" />
 <input type="hidden" id="userRoleName" value="@roleName" />
