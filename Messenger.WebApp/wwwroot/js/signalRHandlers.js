@@ -32,7 +32,7 @@ window.chatSignalRHandlers = (function () {
             
             // اگر activeGroupId تنظیم نشده، پیام را نمایش نده
             if (!activeChatKey) {
-                console.warn("⚠️ activeGroupId not set, cannot filter messages");
+                console.warn("⚠️ activeChatKey not set, cannot filter messages");
                 return;
             }
             
