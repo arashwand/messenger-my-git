@@ -45,6 +45,5 @@ namespace Messenger.WebApp.ServiceHelper.Interfaces
 
         // Private Chats & System Messages
         Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
-        Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(string chatKey, int pageNumber, int pageSize, long messageId, bool loadOlder);
     }
 }

@@ -277,23 +277,6 @@ public partial class IEMessengerDbContext : DbContext
                 .HasConstraintName("FK_MessageFoulReport_Messages");
         });
 
-        modelBuilder.Entity<MessagePrivate>(entity =>
-        {
-            entity.ToTable("MessagePrivate");
-
-            entity.Property(e => e.MessagePrivateId).HasColumnName("MessagePrivateID");
-            entity.Property(e => e.GetterUserId).HasColumnName("GetterUserID");
-            entity.Property(e => e.MessageId).HasColumnName("MessageID");
-
-            entity.HasOne(d => d.GetterUser).WithMany(p => p.MessagePrivates)
-                .HasForeignKey(d => d.GetterUserId)
-                .HasConstraintName("FK_MessagePrivate_Users");
-
-            entity.HasOne(d => d.Message).WithMany(p => p.MessagePrivates)
-                .HasForeignKey(d => d.MessageId)
-                .HasConstraintName("FK_MessagePrivate_Messages");
-        });
-
         modelBuilder.Entity<MessageRead>(entity =>
         {
             entity.HasKey(e => e.ReadMessageId);
