@@ -43,6 +43,8 @@ public partial class Message
 
     public virtual ICollection<MessageRead> MessageReads { get; set; } = new List<MessageRead>();
 
+    public virtual ICollection<MessageRecipient> MessageRecipients { get; set; } = new List<MessageRecipient>();
+
     public virtual ICollection<MessageSaved> MessageSaveds { get; set; } = new List<MessageSaved>();
 
     public virtual ICollection<MessageText> MessageTexts { get; set; } = new List<MessageText>();

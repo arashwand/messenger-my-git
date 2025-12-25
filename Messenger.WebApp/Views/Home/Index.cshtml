@@ -340,6 +340,96 @@
                 });
             };
 
+            // When a private chat is selected
+            window.GetPrivateChatMessages = function(chatKey, chatName, lastReadMessageId) {
+                console.log(`Loading private chat: ${chatKey}, name: ${chatName}`);
+                
+                // Activate chat (similar to ChatActivated for groups)
+                ChatActivated(chatKey, 'Private');
+                
+                $.ajax({
+                    url: `/api/messages/private-chat/${chatKey}`,
+                    type: 'GET',
+                    data: { messageId: lastReadMessageId, pageNumber: 1, pageSize: 50 },
+                    headers: {
+                        'Authorization': 'Bearer ' + getCookie('AuthToken')
+                    },
+                    success: function (messages) {
+                        renderPrivateChatMessages(messages, chatKey, chatName);
+                        
+                        // Push to URL history
+                        try { 
+                            pushChatToUrl('Private', chatKey); 
+                        } catch (e) { 
+                            console.error(e); 
+                        }
+                        
+                        // Re-attach scroll listener for pagination
+                        window.chatApp.reAttachScrollListener();
+                        
+                        // Re-initialize icons
+                        if (typeof init_iconsax === 'function') {
+                            init_iconsax();
+                        }
+                    },
+                    error: function (error) {
+                        console.error("Error loading private chat:", error);
+                        if (typeof window.chatUIRenderer !== 'undefined' && typeof window.chatUIRenderer.showToast === 'function') {
+                            window.chatUIRenderer.showToast("❌ خطا در بارگذاری چت", "error");
+                        }
+                    }
+                });
+            };
+
+            // Render private chat messages
+            window.renderPrivateChatMessages = function(messages, chatKey, chatName) {
+                if (!messages || messages.length === 0) {
+                    $('#chat-details-panel').html('<div class="empty-state">پیامی وجود ندارد</div>').addClass('visible');
+                    return;
+                }
+
+                // Build HTML for messages (simplified version - adjust based on your existing structure)
+                let html = `
+                    <div class="chat-header">
+                        <div class="chat-header-info">
+                            <h5 class="groupName">${chatName}</h5>
+                        </div>
+                        <button id="close-chat-panel-btn" class="btn-close-chat">
+                            <i class="iconsax" data-icon="close"></i>
+                        </button>
+                    </div>
+                    <div class="chat-messages-container" id="chat-messages-body">
+                `;
+
+                messages.forEach(msg => {
+                    const messageText = msg.messageText?.messageTxt || '';
+                    const senderName = msg.senderUser?.nameFamily || 'Unknown';
+                    const messageTime = new Date(msg.messageDateTime).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+                    
+                    html += `
+                        <div class="message-item" data-message-id="${msg.messageId}">
+                            <div class="message-header">
+                                <span class="sender-name">${senderName}</span>
+                                <span class="message-time">${messageTime}</span>
+                            </div>
+                            <div class="message-body">
+                                <p>${messageText}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                    </div>
+                    <div class="chat-input-area">
+                        <!-- Message input area - adjust based on your existing structure -->
+                    </div>
+                `;
+
+                $('#chat-details-panel').html(html).addClass('visible');
+                $('.hide-on-chat-select').addClass('slide-out');
+            };
+
             // When closing the chat view to go back to the list
             $(document).on('click', '#close-chat-panel-btn', function() {
                 $('#chat-details-panel').removeClass('visible');

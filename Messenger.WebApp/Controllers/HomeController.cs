@@ -159,7 +159,7 @@ namespace Messenger.WebApp.Controllers
                 return BadRequest("User ID not found in claims.");
             }
 
-            UserChatModel chatModel = new UserChatModel();
+            var chatModel = new UserChatsViewModel();
 
             //اگر مدیر باشد همه گروه ها و کانالها را نمایش میدهیم
             //TODO :  این سناریو موقتی است و درواقع لازم است کلاسها توسط نقش پرسنل مدیریت شوند و باید به این گروهها یا کانالها جوین شوند
@@ -167,13 +167,15 @@ namespace Messenger.WebApp.Controllers
             //    await _classGroupServiceClient.GetUserClassGroupsAsync(userId);
 
             var userGroups = await _classGroupServiceClient.GetUserClassGroupsAsync(userId);
-
-
             var userChannels = await _channelServiceClient.GetUserChannelsAsync(userId);
+            var privateChats = await _messageService.GetUserPrivateChatsAsync(userId);
 
-
-            chatModel.Groups = userGroups;
-            chatModel.Channels = userChannels;
+            chatModel.Groups = userGroups.ToList();
+            chatModel.Channels = userChannels.ToList();
+            chatModel.PrivateChats = privateChats.ToList();
+            
+            ViewData["baseUrl"] = _baseUrl;
+            
             return PartialView("_classGroups", chatModel);
 
         }

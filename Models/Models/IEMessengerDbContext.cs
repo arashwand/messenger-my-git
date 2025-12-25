@@ -37,7 +37,7 @@ public partial class IEMessengerDbContext : DbContext
 
     public virtual DbSet<MessageFoulReport> MessageFoulReports { get; set; }
 
-    
+    public virtual DbSet<MessageRecipient> MessageRecipients { get; set; }
 
     public virtual DbSet<MessageRead> MessageReads { get; set; }
 
@@ -320,6 +320,32 @@ public partial class IEMessengerDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_MessageRead_Users");
+        });
+
+        modelBuilder.Entity<MessageRecipient>(entity =>
+        {
+            entity.HasKey(e => e.MessageRecipientId);
+
+            entity.ToTable("MessageRecipients");
+
+            entity.HasIndex(e => new { e.MessageId, e.RecipientUserId }, "IX_MessageRecipients_Message_Recipient");
+
+            entity.HasIndex(e => e.RecipientUserId, "IX_MessageRecipients_RecipientUserId");
+
+            entity.Property(e => e.MessageRecipientId).HasColumnName("MessageRecipientID");
+            entity.Property(e => e.MessageId).HasColumnName("MessageID");
+            entity.Property(e => e.RecipientUserId).HasColumnName("RecipientUserID");
+            entity.Property(e => e.ReadDateTime).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Message).WithMany(p => p.MessageRecipients)
+                .HasForeignKey(d => d.MessageId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_MessageRecipients_Messages");
+
+            entity.HasOne(d => d.RecipientUser).WithMany(p => p.MessageRecipients)
+                .HasForeignKey(d => d.RecipientUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MessageRecipients_Users");
         });
 
         modelBuilder.Entity<MessageSaved>(entity =>
