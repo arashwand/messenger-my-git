@@ -460,7 +460,19 @@
              console.log('---------------------------------------------------------------------------------' + chatSelectedTitle);
 
 
-             const selectedChatId = `${groupType}_${chatId}`
+             let selectedChatId;
+             
+             if (groupType === 'Private') {
+                 // ✅ برای Private: ایجاد groupKey با الگوی private_min_max
+                 const currentUserId = parseInt($('#userId').val());
+                 const otherUserId = parseInt(chatId);
+                 const minId = Math.min(currentUserId, otherUserId);
+                 const maxId = Math.max(currentUserId, otherUserId);
+                 selectedChatId = `private_${minId}_${maxId}`;
+             } else {
+                 selectedChatId = `${groupType}_${chatId}`;
+             }
+             
              if(selectedChat.length) {
                  const chatItemsBody = $('#chatContactTab');
                  const chatItems = chatItemsBody.find('.active');

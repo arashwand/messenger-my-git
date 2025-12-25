@@ -20,6 +20,9 @@
         }
     }
     
+    // ✅ دریافت نام چت
+    var chatName = ViewData["chatName"]?.ToString() ?? "چت";
+    
     // دریافت chatKey برای چت‌های خصوصی
     var chatKey = ViewData["chatKey"]?.ToString() ?? "";
     
@@ -115,7 +118,7 @@
                         @* <img src="/chatzy/assets/iconsax/group.svg" alt="group" />*@
                     </div>
                     <div>
-                        <h4 class="fw-semibold groupName"></h4>
+                        <h4 class="fw-semibold groupName">@chatName</h4>
                         <small class="text-muted" id="typing-indicator-@chatGroupId"></small>
                         <div id="@pinnedMessageIdGenerated" class="pinnedMessagesPlaceholder" data-chat-id="@chatGroupId" data-chat-type="@chatType"></div>
 

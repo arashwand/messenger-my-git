@@ -24,6 +24,7 @@ namespace Messenger.API.Hubs
         private readonly PushService _pushService;
         private readonly IMessageQueueService _messageQueueService;
         private readonly ISystemMonitorService _systemMonitor;
+        private readonly IUserService _userService;
 
         private const string BridgeGroupName = "BRIDGE_SERVICES";
 
@@ -36,7 +37,8 @@ namespace Messenger.API.Hubs
                        IRedisUnreadManage redisUnreadManage,
                        PushService pushService,
                        IMessageQueueService messageQueueService,
-                       ISystemMonitorService systemMonitor)
+                       ISystemMonitorService systemMonitor,
+                       IUserService userService)
         {
             _messageService = messageService;
             _classGroupService = classGroupService;
@@ -48,6 +50,7 @@ namespace Messenger.API.Hubs
             _pushService = pushService;
             _messageQueueService = messageQueueService;
             _systemMonitor = systemMonitor;
+            _userService = userService;
         }
 
         // =================== Connection lifecycle ===================
@@ -73,6 +76,16 @@ namespace Messenger.API.Hubs
                     return;
                 }
 
+                // دریافت اطلاعات کاربر
+                var user = await _userService.GetUserByIdAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning($"User {userId} not found in database");
+                    Context.Abort();
+                    return;
+                }
+
+                // 1. گروهها و کانالهای معمولی (کد موجود)
                 var groupKeys = await _userStatusService.GetUserGroupKeysAsync(userId);
                 if (groupKeys == null || !groupKeys.Any())
                 {
@@ -102,6 +115,33 @@ namespace Messenger.API.Hubs
                             await Clients.Caller.SendAsync("UserStatusChanged", userId, true, groupId, groupType);
                         }
                     }
+                }
+
+                // 2. ✅ گروههای چت خصوصی (Private 1-to-1)
+                var privateChats = await _messageService.GetUserPrivateChatsAsync(userId);
+                if (privateChats != null && privateChats.Any())
+                {
+                    foreach (var chat in privateChats.Where(c => !c.IsSystemChat && c.OtherUserId.HasValue))
+                    {
+                        var privateChatGroupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, chat.OtherUserId.Value);
+                        await Groups.AddToGroupAsync(Context.ConnectionId, privateChatGroupKey);
+                        await _userStatusService.SetUserOnlineAsync(privateChatGroupKey, userId);
+                        
+                        _logger.LogInformation($"User {userId} joined private chat group: {privateChatGroupKey}");
+                    }
+                }
+
+                // 3. ✅ گروه سیستمی شخصی
+                var systemChatKey = PrivateChatHelper.GenerateSystemChatGroupKey(userId);
+                await Groups.AddToGroupAsync(Context.ConnectionId, systemChatKey);
+                _logger.LogInformation($"User {userId} joined system chat group: {systemChatKey}");
+
+                // 4. ✅ گروه نقش (برای پیامهای انبوه)
+                var roleGroupKey = PrivateChatHelper.GenerateRoleGroupKey(user.RoleName);
+                if (!string.IsNullOrEmpty(roleGroupKey))
+                {
+                    await Groups.AddToGroupAsync(Context.ConnectionId, roleGroupKey);
+                    _logger.LogInformation($"User {userId} joined role group: {roleGroupKey}");
                 }
 
                 _ = PopulateUnreadCountsForUserAsync(userId);
@@ -614,7 +654,18 @@ namespace Messenger.API.Hubs
         {
             if (!IsBridge()) userId = GetCurrentUserId();
             var fullName = GetCurrentUserFullName();
-            var groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+            
+            string groupKey;
+            if (groupType == ConstChat.PrivateType)
+            {
+                // ✅ برای چت خصوصی
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, groupId);
+            }
+            else
+            {
+                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+            }
+            
             _logger.LogInformation("Typing event sent for user {UserId} in group {GroupKey}", userId, groupKey);
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
                 groupKey,
@@ -628,7 +679,16 @@ namespace Messenger.API.Hubs
         public async Task StopTyping(long userId, int groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
-            var groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+            
+            string groupKey;
+            if (groupType == ConstChat.PrivateType)
+            {
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, groupId);
+            }
+            else
+            {
+                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+            }
 
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
                 groupKey,

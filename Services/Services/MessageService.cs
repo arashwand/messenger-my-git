@@ -2407,7 +2407,7 @@ namespace Messenger.Services.Services
                     privateChats.Add(new PrivateChatItemDto
                     {
                         ChatId = chat.OtherUserId,
-                        ChatKey = $"private_{chat.OtherUserId}",
+                        ChatKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, chat.OtherUserId), // ✅ استفاده از Helper
                         ChatName = otherUser.NameFamily,
                         ProfilePicName = otherUser.ProfilePicName,
                         LastMessage = new ChatMessageDto
