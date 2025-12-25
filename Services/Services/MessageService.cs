@@ -2338,7 +2338,7 @@ namespace Messenger.Services.Services
                 // 1. Get regular private messages (one-to-one)
                 var regularPrivateMessages = await _context.Messages
                     .Where(m => m.MessageType == (byte)EnumMessageType.Private && !m.IsSystemMessage && !m.IsHidden)
-                    .Where(m => m.SenderUserId == userId || m.MessagePrivates.Any(mp => mp.GetterUserId == userId))
+                    .Where(m => m.SenderUserId == userId || m.OwnerId == userId)
                     .Include(m => m.MessageTexts)
                     .Include(m => m.SenderUser)
                     .Include(m => m.MessagePrivates)
