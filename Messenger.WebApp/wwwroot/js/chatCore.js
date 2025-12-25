@@ -70,15 +70,22 @@ window.chatApp = (function ($) {
             // برای Private: استفاده از chatKey از سرور
             activeChatKey = chatKey;
             console.log(`📍 Private chat initialized: ChatKey=${activeChatKey}`);
-        } else if (groupType === 'Private' && chatId) {
+        } else if (groupType === 'Private' && !isNaN(chatId) && chatId > 0) {
             // fallback: محاسبه chatKey اگر در سرور تنظیم نشده
             const currentUserId = parseInt($('#userId').val());
-            const otherUserId = chatId;
-            const minId = Math.min(currentUserId, otherUserId);
-            const maxId = Math.max(currentUserId, otherUserId);
-            activeChatKey = `private_${minId}_${maxId}`;
-            console.log(`📍 Private chat initialized (computed): ChatKey=${activeChatKey} (current=${currentUserId}, other=${otherUserId})`);
-        } else if (groupType && chatId) {
+            
+            // اعتبارسنجی
+            if (isNaN(currentUserId) || currentUserId <= 0) {
+                console.error('⚠️ Invalid currentUserId for Private chat initialization');
+                activeChatKey = null;
+            } else {
+                const otherUserId = chatId;
+                const minId = Math.min(currentUserId, otherUserId);
+                const maxId = Math.max(currentUserId, otherUserId);
+                activeChatKey = `private_${minId}_${maxId}`;
+                console.log(`📍 Private chat initialized (computed): ChatKey=${activeChatKey} (current=${currentUserId}, other=${otherUserId})`);
+            }
+        } else if (groupType && !isNaN(chatId) && chatId > 0) {
             // برای Group/Channel
             activeChatKey = `${groupType}_${chatId}`;
             console.log(`📍 Group chat initialized: ChatKey=${activeChatKey}`);

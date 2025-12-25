@@ -30,6 +30,12 @@ window.chatSignalRHandlers = (function () {
             // ✅ دریافت چت فعلی
             const activeChatKey = window.activeGroupId; // مثلاً "private_5_10" یا "ClassGroup_123"
             
+            // اگر activeGroupId تنظیم نشده، پیام را نمایش نده
+            if (!activeChatKey) {
+                console.warn("⚠️ activeGroupId not set, cannot filter messages");
+                return;
+            }
+            
             // ✅ فیلتر: فقط پیامهای چت فعلی
             const isForActiveChat = (message.chatKey === activeChatKey);
             

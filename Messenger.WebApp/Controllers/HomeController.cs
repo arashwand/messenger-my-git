@@ -370,11 +370,17 @@ namespace Messenger.WebApp.Controllers
                     chatName = otherUser?.NameFamily ?? "کاربر";
                     
                     // محاسبه chatKey برای Private
-                    var currentUserId = long.Parse(userId);
-                    var otherUserId = (long)chatId;
-                    var minId = Math.Min(currentUserId, otherUserId);
-                    var maxId = Math.Max(currentUserId, otherUserId);
-                    chatKey = $"private_{minId}_{maxId}";
+                    if (long.TryParse(userId, out var currentUserId))
+                    {
+                        var otherUserId = (long)chatId;
+                        var minId = Math.Min(currentUserId, otherUserId);
+                        var maxId = Math.Max(currentUserId, otherUserId);
+                        chatKey = $"private_{minId}_{maxId}";
+                    }
+                    else
+                    {
+                        _logger.LogError("Invalid userId for Private chat: {UserId}", userId);
+                    }
                 }
                 else if (groupType == ConstChat.ClassGroupType)
                 {
