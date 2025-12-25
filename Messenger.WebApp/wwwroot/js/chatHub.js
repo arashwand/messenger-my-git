@@ -1820,7 +1820,13 @@ window.chatApp = (function ($) {
             // ثبت رویدادهای دریافتی از سرور
             //signalRConnection.on("ReceiveMessage", message);
             signalRConnection.on("ReceiveMessage", function (message) {
-                console.log("Displaying message received on handler :", message);
+                console.log("📩 Displaying message received on handler:", {
+                    messageId: message.messageId,
+                    chatKey: message.chatKey,
+                    groupId: message.groupId,
+                    groupType: message.groupType
+                });
+                
                 if (message.senderUserId !== currentUser) {
                     displayMessage(message);
                 } else if (message.isSystemMessage) {

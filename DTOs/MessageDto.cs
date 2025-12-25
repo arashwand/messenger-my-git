@@ -38,11 +38,20 @@ public class MessageDto
     public long? ReceiverUserId { get; set; }
 
     /// <summary>
+    /// کلید چت برای routing در کلاینت
+    /// - Group: "ClassGroup_123"
+    /// - Channel: "ChannelGroup_456"
+    /// - Private: "private_5_10"
+    /// </summary>
+    public string? ChatKey { get; set; }
+    
+    /// <summary>
     /// شناسه گروه/کاربر هدف برای routing در کلاینت
     /// - برای Group: ClassId
     /// - برای Channel: ChannelId  
     /// - برای Private: otherUserId (کاربر مقابل)
     /// </summary>
+    [Obsolete("Use ChatKey instead for consistent routing")]
     public long GroupId { get; set; }
     
     /// <summary>
