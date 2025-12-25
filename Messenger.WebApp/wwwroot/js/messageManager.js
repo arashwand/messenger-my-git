@@ -125,16 +125,40 @@ window.chatMessageManager = (function ($) {
 
         const chatId = parseInt($('#current-group-id-hidden-input').val());
         const currentGroupType = $('#current-group-type-hidden-input').val();
+        const chatKey = $('#chatKey').val();
+
+        // تعیین URL و پارامترها بر اساس نوع چت
+        let ajaxConfig;
+        if (currentGroupType === 'Private') {
+            if (!chatKey) {
+                console.error('chatKey not found for private chat');
+                getNewerDataRunning = false;
+                return Promise.resolve();
+            }
+            ajaxConfig = {
+                url: '/Home/GetNewerPrivateChatMessages',
+                type: 'GET',
+                data: {
+                    chatKey: chatKey,
+                    messageId: startMessageId,
+                    pageSize: 50
+                }
+            };
+        } else {
+            ajaxConfig = {
+                url: '/Home/GetNewerMessages',
+                type: 'GET',
+                data: {
+                    chatId: chatId,
+                    groupType: currentGroupType,
+                    messageId: startMessageId,
+                    pageSize: 50
+                }
+            };
+        }
 
         return $.ajax({
-            url: '/Home/GetNewerMessages',
-            type: 'GET',
-            data: {
-                chatId: chatId,
-                groupType: currentGroupType,
-                messageId: startMessageId,
-                pageSize: 50
-            },
+            ...ajaxConfig,
             success: function (response) {
                 if (response.success && response.data.length > 0) {
                     console.log(`✅ Loaded ${response.data.length} newer messages.`);
@@ -278,17 +302,41 @@ window.chatMessageManager = (function ($) {
         console.log('last messageId is :' + lastmessageId);
         const chatId = parseInt($('#current-group-id-hidden-input').val());
         const currentGroupType = $('#current-group-type-hidden-input').val();
+        const chatKey = $('#chatKey').val();
+
+        // تعیین URL و پارامترها بر اساس نوع چت
+        let ajaxConfig;
+        if (currentGroupType === 'Private') {
+            if (!chatKey) {
+                console.error('chatKey not found for private chat');
+                getOldDataRunning = false;
+                return Promise.resolve();
+            }
+            ajaxConfig = {
+                url: '/Home/GetOlderPrivateChatMessages',
+                type: 'GET',
+                data: {
+                    chatKey: chatKey,
+                    messageId: lastmessageId,
+                    pageSize: 50
+                }
+            };
+        } else {
+            ajaxConfig = {
+                url: '/Home/GetOldMessage',
+                type: 'POST',
+                data: {
+                    chatId: chatId,
+                    groupType: currentGroupType,
+                    messageId: lastmessageId,
+                    loadOlder: true,
+                    loadBothDirections: false
+                }
+            };
+        }
 
         return $.ajax({
-            url: '/Home/GetOldMessage',
-            type: 'POST',
-            data: {
-                chatId: chatId,
-                groupType: currentGroupType,
-                messageId: lastmessageId,
-                loadOlder: true,
-                loadBothDirections: false
-            },
+            ...ajaxConfig,
             success: function (response) {
                 if (response.success) {
                     if (response.data.length < 50) {
