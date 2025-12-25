@@ -799,7 +799,7 @@ namespace Messenger.Services.Services
             try
             {
                 // Access check (skip for Private since OwnerId ensures access)
-                if (chatType != "Private")
+                if (chatType != ConstChat.PrivateType)
                 {
                     var hasAccess = chatType == ConstChat.ClassGroupType ?
                         await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, chatId)
@@ -818,11 +818,14 @@ namespace Messenger.Services.Services
                 {
                     ConstChat.ClassGroupType => EnumMessageType.Group,
                     ConstChat.ChannelGroupType => EnumMessageType.Channel,
-                    "Private" => EnumMessageType.Private,
+                    ConstChat.PrivateType => EnumMessageType.Private,
                     _ => throw new ArgumentException($"Unsupported chat type: {chatType}")
                 };
 
-                var baseQuery = GetMessagesQuery(chatId, chatEnumType);
+                // For Private chats, chatId is the other user's ID, so pass currentUserId as well
+                var baseQuery = chatType == ConstChat.PrivateType 
+                    ? GetMessagesQuery(chatId, chatEnumType, currentUserId)
+                    : GetMessagesQuery(chatId, chatEnumType);
                 if (baseQuery == null)
                     return new List<MessageDto>();
 
@@ -1128,7 +1131,7 @@ namespace Messenger.Services.Services
         /// <param name="chatId"></param>
         /// <param name="messageType">نوع چت</param>
         /// <returns></returns>
-        private IQueryable<Message> GetMessagesQuery(long targetId, EnumMessageType messageType)
+        private IQueryable<Message> GetMessagesQuery(long targetId, EnumMessageType messageType, long? currentUserId = null)
         {
             return messageType switch
             {
@@ -1158,10 +1161,12 @@ namespace Messenger.Services.Services
 
                 EnumMessageType.Private => _context.Messages
                     .AsNoTracking()
-                    .Where(m => m.OwnerId == targetId && 
-                        m.MessageType == (byte)EnumMessageType.Private && 
+                    .Where(m => m.MessageType == (byte)EnumMessageType.Private && 
                         !m.IsHidden && 
-                        !m.IsSystemMessage)
+                        !m.IsSystemMessage &&
+                        currentUserId.HasValue &&
+                        ((m.SenderUserId == currentUserId.Value && m.OwnerId == targetId) ||
+                         (m.SenderUserId == targetId && m.OwnerId == currentUserId.Value)))
                     .Include(m => m.MessageTexts)
                     .Include(m => m.SenderUser)
                     .Include(m => m.ReplyMessage).ThenInclude(r => r.MessageTexts)
