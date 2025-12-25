@@ -57,21 +57,27 @@ namespace MessengerApp.WebAPI.Controllers
 
         [HttpGet("search")]
         [Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
-        public async Task<ActionResult<IEnumerable<UserDto>>> SearchUsers([FromQuery] string query)
+        public async Task<ActionResult<IEnumerable<UserDto>>> SearchUsers([FromQuery] string query, [FromQuery] string searchType = "name")
         {
             try
             {
                 var currentUserRole = GetCurrentUserRole();
-                _logger.LogInformation("User with role {Role} is searching for users with query: {Query}", currentUserRole, query);
+                _logger.LogInformation("User with role {Role} is searching for users with query: {Query}, type: {SearchType}", currentUserRole, query, searchType);
 
                 // Validate input: minimum 2 characters
-                if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+                if (string.IsNullOrWhiteSpace(query))
                 {
-                    _logger.LogWarning("Invalid search query: {Query}", query);
-                    return BadRequest("Search query must be at least 2 characters.");
+                    _logger.LogWarning("Empty search query");
+                    return BadRequest(new { message = "متن جستجو نمیتواند خالی باشد." });
                 }
 
-                var users = await _userService.SearchUsersAsync(query);
+                if (query.Length < 2)
+                {
+                    _logger.LogWarning("Invalid search query: {Query}", query);
+                    return BadRequest(new { message = "حداقل ۲ کاراکتر برای جستجو لازم است." });
+                }
+
+                var users = await _userService.SearchUsersAsync(query, searchType);
                 _logger.LogInformation("Search completed. Found {Count} users.", users?.Count() ?? 0);
                 
                 return Ok(users);
@@ -79,7 +85,7 @@ namespace MessengerApp.WebAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while searching users with query: {Query}", query);
-                return StatusCode(500, "An error occurred while searching for users.");
+                return StatusCode(500, new { message = "An error occurred while searching for users." });
             }
         }
 

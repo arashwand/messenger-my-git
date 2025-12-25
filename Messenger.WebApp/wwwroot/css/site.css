@@ -972,3 +972,55 @@ body {
 .highlight-message {
     animation: highlight-animation 4s ease-in-out;
 }
+
+/*****************************************/
+/* نتایج جستجو */
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-bottom: 1px solid rgba(var(--content-color), 0.1);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+    .search-result-item:hover {
+        background: rgba(var(--theme-color), 0.05);
+    }
+
+.search-result-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.search-result-info {
+    flex: 1;
+}
+
+.search-result-name {
+    font-weight: 600;
+    color: rgba(var(--dark-text), 1);
+    font-size: 14px;
+    margin: 0;
+}
+
+.search-result-role {
+    font-size: 12px;
+    color: rgba(var(--content-color), 1);
+    margin: 2px 0 0 0;
+}
+
+.search-loading {
+    text-align: center;
+    padding: 20px;
+    color: rgba(var(--theme-color), 1);
+}
+
+.search-no-results {
+    text-align: center;
+    padding: 20px;
+    color: rgba(var(--content-color), 1);
+}

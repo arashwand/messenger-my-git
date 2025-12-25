@@ -107,40 +107,41 @@ namespace Messenger.Services.Services
         /// </summary>
         /// <param name="senderUserId"></param>
         /// <param name="chatId"></param>
-        /// <param name="groupType"></param>
+        /// <param name="chatType"></param>
         /// <param name="messageText"></param>
         /// <param name="fileIds"></param>
         /// <param name="replyToMessageId"></param>
         /// <param name="isPortalMessage">اگه ارسال کننده پرتال بود</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, long chatId, string groupType, string messageText,
+        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, long chatId, string chatType, string messageText,
              List<long>? fileIds = null, long? replyToMessageId = null, bool isPin = false, bool isPortalMessage = false)
         {
             _logger.LogInformation($"Attempting to send class group message from {senderUserId} to class {chatId}");
 
             // بررسی اینکه ارسال کننده عضو این گروه است یا خیر
+            //  فعلا تا تصمیم گیری نهایی این رو معلق میکنیم
             bool hasAccess = false;
-            if (isPortalMessage)
-            {
-                hasAccess = await _personnelChatAccessService.HasAccessToSendToChatAsync(senderUserId, chatId, groupType);
-            }
-            else
-            {
-                hasAccess = groupType == ConstChat.ClassGroupType ?
-               await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, chatId)
-               : await _channelService.IsUserMemberOfChannelAsync(senderUserId, chatId);
-            }
+            //if (isPortalMessage)
+            //{
+            //    hasAccess = await _personnelChatAccessService.HasAccessToSendToChatAsync(senderUserId, chatId, chatType);
+            //}
+            //else
+            //{
+            hasAccess = chatType == ConstChat.ClassGroupType ?
+           await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, chatId)
+           : await _channelService.IsUserMemberOfChannelAsync(senderUserId, chatId);
+            //}
+            // بدست اوردن نقش کاربر
+            var user = await _userService.GetUserByIdAsync(senderUserId);
 
             if (!hasAccess)
-            {
-                // بدست اوردن نقش کاربر
-                var user = await _userService.GetUserByIdAsync(senderUserId);
+            {               
                 if (user == null)
                 {
                     throw new Exception("User is not a member of this class group");
                 }
-                // اگر نقش ادمین یا مدرس بود اجازه ارسال پیام بده
+                // اگر نقش ادمین یا پرسنل بود اجازه ارسال پیام بده
                 if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
                 {
                     throw new Exception("User is not a member of this class group");
@@ -152,7 +153,13 @@ namespace Messenger.Services.Services
             try
             {
                 //تعین نوع چت
-                var chatType = groupType == ConstChat.ClassGroupType ? (byte)EnumMessageType.Group : (byte)EnumMessageType.Channel;
+                var chatTypeDetected = chatType switch
+                {
+                    ConstChat.ClassGroupType => (byte)EnumMessageType.Group,
+                    ConstChat.ChannelGroupType => (byte)EnumMessageType.Channel,
+                    ConstChat.PrivateType => (byte)EnumMessageType.Private,
+                    _ => throw new ArgumentException("Invalid chat type", nameof(chatType))
+                };
 
                 // ایجاد پیام
                 var messageEntity = new Message
@@ -160,7 +167,7 @@ namespace Messenger.Services.Services
                     OwnerId = chatId,
                     SenderUserId = senderUserId,
                     MessageDateTime = DateTime.UtcNow,
-                    MessageType = chatType,
+                    MessageType = chatTypeDetected,
                     ReplyMessageId = replyToMessageId,
                     IsPin = isPin,
                     IsSystemMessage = isPortalMessage
@@ -210,7 +217,7 @@ namespace Messenger.Services.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync(); // تأیید تراکنش
 
-                var user = await _userService.GetUserByIdAsync(senderUserId);
+                //var user = await _userService.GetUserByIdAsync(senderUserId);
                 var replyMessage = replyToMessageId != null ? await GetMessageByIdAsync(senderUserId, replyToMessageId.Value) : null;
 
                 var fileAttachments = fileIds != null ? await GetMessageFiles(messageEntity.MessageId) : null;
@@ -406,7 +413,7 @@ namespace Messenger.Services.Services
 
             if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
             {
-                if (chatType == ConstChat.ChannelGroupType)
+                if (chatType == ConstChat.ClassGroupType)
                 {
                     var isMember = await _classGroupService.IsUserMemberOfClassGroupAsync(userId, chatId);
                     if (!isMember)
@@ -700,7 +707,7 @@ namespace Messenger.Services.Services
                 .Include(m => m.ReplyMessage)
                     .ThenInclude(rm => rm.SenderUser)
                 .Include(m => m.MessageFiles).ThenInclude(mf => mf.FileExtension)
-                .Where(m => m.OwnerId== channelId && m.IsHidden == false)
+                .Where(m => m.OwnerId == channelId && m.IsHidden == false)
                 .OrderByDescending(m => m.MessageDateTime)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -1148,10 +1155,15 @@ namespace Messenger.Services.Services
             byte messageType = (byte)EnumMessageType.Group;
             byte messageTypeAll = 3;
 
-            if (chatType == ConstChat.ChannelGroup)
+            if (chatType == ConstChat.ChannelGroupType)
             {
                 messageType = (byte)EnumMessageType.Channel;
                 messageTypeAll = 4;
+            }
+            else if (chatType == ConstChat.PrivateType)
+            {
+                messageType = (byte)EnumMessageType.Private;
+                messageTypeAll = 2; // For Private, use the same type since there's no "all private" category
             }
 
             var query = _context.Messages
@@ -2093,7 +2105,7 @@ namespace Messenger.Services.Services
                 foreach (var tempPath in filesToPermanentlyDelete)
                 {
                     var originalPath = _fileManagementService.GetOriginalPathFromTemp(tempPath);
-                   await _fileManagementService.MoveFileAsync(tempPath, originalPath);
+                    await _fileManagementService.MoveFileAsync(tempPath, originalPath);
                 }
 
                 throw;
@@ -2121,8 +2133,8 @@ namespace Messenger.Services.Services
 
         public async Task<int> GetUnreadCountAsync(long userId, string groupType, long targetId)
         {
-            if (groupType != ConstChat.ClassGroupType && groupType != ConstChat.ChannelGroupType)
-                throw new ArgumentException("Invalid groupType. Must be 'Group' or 'Channel'.");
+            if (groupType != ConstChat.ClassGroupType && groupType != ConstChat.ChannelGroupType && groupType != ConstChat.PrivateType)
+                throw new ArgumentException("Invalid groupType. Must be 'ClassGroup', 'ChannelGroup', or 'Private'.");
 
             // Use the new Redis method to count unread messages
             return await _redisUnreadManage.GetUnreadCountAsync(userId, targetId, groupType);
@@ -2171,14 +2183,30 @@ namespace Messenger.Services.Services
                 IQueryable<long> chatMessageIdsQuery;
 
                 byte messageTypeByte = (byte)EnumMessageType.Group;
-                if (groupType == ConstChat.ChannelGroup)
+                if (groupType == ConstChat.ChannelGroupType)
                 {
                     messageTypeByte = (byte)EnumMessageType.Channel;
                 }
+                else if (groupType == ConstChat.PrivateType)
+                {
+                    messageTypeByte = (byte)EnumMessageType.Private;
+                }
 
-                chatMessageIdsQuery = _context.Messages
-                    .Where(m => m.OwnerId == targetId && m.MessageType == messageTypeByte)
-                    .Select(m => m.MessageId);
+                // برای چت خصوصی، باید از MessagePrivates استفاده کنیم
+                if (groupType == ConstChat.PrivateType)
+                {
+                    chatMessageIdsQuery = _context.Messages
+                        .Where(m => m.MessageType == messageTypeByte &&
+                                    ((m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == targetId)) ||
+                                     (m.SenderUserId == targetId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))))
+                        .Select(m => m.MessageId);
+                }
+                else
+                {
+                    chatMessageIdsQuery = _context.Messages
+                        .Where(m => m.OwnerId == targetId && m.MessageType == messageTypeByte)
+                        .Select(m => m.MessageId);
+                }
 
 
                 // ایدی اخرین پیام خوانده شده کاربر
@@ -2227,6 +2255,15 @@ namespace Messenger.Services.Services
                     chatMessageIdsQuery = _context.Messages
                         .Where(chm => chm.OwnerId == targetId)
                         .Select(chm => chm.MessageId);
+                }
+                else if (groupType == ConstChat.PrivateType)
+                {
+                    // برای چت خصوصی، باید از MessagePrivates استفاده کنیم
+                    chatMessageIdsQuery = _context.Messages
+                        .Where(m => m.MessageType == (byte)EnumMessageType.Private &&
+                                    ((m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == targetId)) ||
+                                     (m.SenderUserId == targetId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))))
+                        .Select(m => m.MessageId);
                 }
                 else
                 {
@@ -2279,6 +2316,338 @@ namespace Messenger.Services.Services
         }
 
 
+
+        #endregion
+
+
+        #region Private Chats & System Messages
+
+        public async Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning($"User {userId} not found");
+                    return Enumerable.Empty<PrivateChatItemDto>();
+                }
+
+                var privateChats = new List<PrivateChatItemDto>();
+
+                // 1. Get regular private messages (one-to-one)
+                var regularPrivateMessages = await _context.Messages
+                    .Where(m => m.MessageType == (byte)EnumMessageType.Private && !m.IsSystemMessage && !m.IsHidden)
+                    .Where(m => m.SenderUserId == userId || m.OwnerId == userId)
+                    .Include(m => m.MessageTexts)
+                    .Include(m => m.SenderUser)
+                    .Include(m => m.MessagePrivates)
+                    .ToListAsync();
+
+                // Group by other user
+                var groupedByOtherUser = regularPrivateMessages
+                    .Select(m => new
+                    {
+                        Message = m,
+                        OtherUserId = m.SenderUserId == userId
+                            ? m.MessagePrivates.FirstOrDefault()?.GetterUserId ?? m.OwnerId
+                            : m.SenderUserId
+                    })
+                    .Where(x => x.OtherUserId > 0)
+                    .GroupBy(x => x.OtherUserId)
+                    .Select(g => new
+                    {
+                        OtherUserId = g.Key,
+                        LastMessage = g.OrderByDescending(x => x.Message.MessageDateTime).First().Message
+                    })
+                    .ToList();
+
+                foreach (var chat in groupedByOtherUser)
+                {
+                    var otherUser = await _context.Users.FindAsync(chat.OtherUserId);
+                    if (otherUser == null) continue;
+
+                    // Count unread messages
+                    var unreadCount = await _context.Messages
+                        .Where(m => m.SenderUserId == chat.OtherUserId && m.OwnerId == userId)
+                        .Where(m => !m.MessageReads.Any(mr => mr.UserId == userId))
+                        .CountAsync();
+
+                    privateChats.Add(new PrivateChatItemDto
+                    {
+                        ChatId = chat.OtherUserId,
+                        ChatKey = $"private_{chat.OtherUserId}",
+                        ChatName = otherUser.NameFamily,
+                        ProfilePicName = otherUser.ProfilePicName,
+                        LastMessage = new ChatMessageDto
+                        {
+                            MessageId = chat.LastMessage.MessageId,
+                            Text = chat.LastMessage.MessageTexts.FirstOrDefault()?.MessageTxt,
+                            SenderId = chat.LastMessage.SenderUserId,
+                            SenderName = chat.LastMessage.SenderUser?.NameFamily,
+                            SentAt = chat.LastMessage.MessageDateTime
+                        },
+                        UnreadCount = unreadCount,
+                        IsSystemChat = false,
+                        OtherUserId = chat.OtherUserId,
+                        LastMessageDateTime = chat.LastMessage.MessageDateTime
+                    });
+                }
+
+                // 2. Get system messages based on user role
+                var systemMessages = new List<Message>();
+
+                // Check for messages sent to all students
+                if (user.RoleName == ConstRoles.Student)
+                {
+                    var allStudentsMessages = await _context.Messages
+                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.AllStudents && !m.IsHidden)
+                        .Include(m => m.MessageTexts)
+                        .Include(m => m.SenderUser)
+                        .OrderByDescending(m => m.MessageDateTime)
+                        .ToListAsync();
+                    systemMessages.AddRange(allStudentsMessages);
+                }
+
+                // Check for messages sent to all teachers
+                if (user.RoleName == ConstRoles.Teacher)
+                {
+                    var allTeachersMessages = await _context.Messages
+                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.AllTeachers && !m.IsHidden)
+                        .Include(m => m.MessageTexts)
+                        .Include(m => m.SenderUser)
+                        .OrderByDescending(m => m.MessageDateTime)
+                        .ToListAsync();
+                    systemMessages.AddRange(allTeachersMessages);
+                }
+
+                // Check for messages sent to all personnel
+                if (user.RoleName == ConstRoles.Personel)
+                {
+                    var allPersonnelMessages = await _context.Messages
+                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.AllPersonel && !m.IsHidden)
+                        .Include(m => m.MessageTexts)
+                        .Include(m => m.SenderUser)
+                        .OrderByDescending(m => m.MessageDateTime)
+                        .ToListAsync();
+                    systemMessages.AddRange(allPersonnelMessages);
+                }
+
+                // Check for messages sent to specific users via MessageRecipients
+                var specificUserMessages = await _context.Messages
+                    .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.Private && !m.IsHidden)
+                    .Where(m => m.MessageRecipients.Any(mr => mr.RecipientUserId == userId))
+                    .Include(m => m.MessageTexts)
+                    .Include(m => m.SenderUser)
+                    .Include(m => m.MessageRecipients.Where(mr => mr.RecipientUserId == userId))
+                    .OrderByDescending(m => m.MessageDateTime)
+                    .ToListAsync();
+                systemMessages.AddRange(specificUserMessages);
+
+                // Add system chat if there are system messages
+                if (systemMessages.Any())
+                {
+                    var lastSystemMessage = systemMessages.OrderByDescending(m => m.MessageDateTime).First();
+                    
+                    // Count unread system messages
+                    var unreadSystemCount = systemMessages.Count(m => 
+                        !m.MessageReads.Any(mr => mr.UserId == userId));
+
+                    privateChats.Add(new PrivateChatItemDto
+                    {
+                        ChatId = userId, // Use current user's ID for system chat
+                        ChatKey = $"systemchat_{userId}",
+                        ChatName = "ایران اروپا", // School name from config
+                        ProfilePicName = "system_icon",
+                        LastMessage = new ChatMessageDto
+                        {
+                            MessageId = lastSystemMessage.MessageId,
+                            Text = lastSystemMessage.MessageTexts.FirstOrDefault()?.MessageTxt,
+                            SenderId = lastSystemMessage.SenderUserId,
+                            SenderName = lastSystemMessage.SenderUser?.NameFamily,
+                            SentAt = lastSystemMessage.MessageDateTime
+                        },
+                        UnreadCount = unreadSystemCount,
+                        IsSystemChat = true,
+                        OtherUserId = null,
+                        LastMessageDateTime = lastSystemMessage.MessageDateTime
+                    });
+                }
+
+                // Sort by last message date (newest first)
+                return privateChats.OrderByDescending(c => c.LastMessageDateTime).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting private chats for user {UserId}", userId);
+                return Enumerable.Empty<PrivateChatItemDto>();
+            }
+        }
+
+        public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long userId, string chatKey, 
+            int pageNumber, int pageSize, long messageId = 0, bool loadOlder = false)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning($"User {userId} not found");
+                    return Enumerable.Empty<MessageDto>();
+                }
+
+                IQueryable<Message> query;
+
+                // Parse chatKey to determine chat type
+                if (chatKey.StartsWith("systemchat_"))
+                {
+                    // System messages
+                    query = _context.Messages
+                        .Where(m => m.IsSystemMessage && !m.IsHidden);
+
+                    // Filter by user role
+                    if (user.RoleName == ConstRoles.Student)
+                    {
+                        query = query.Where(m => m.MessageType == (byte)EnumMessageType.AllStudents);
+                    }
+                    else if (user.RoleName == ConstRoles.Teacher)
+                    {
+                        query = query.Where(m => m.MessageType == (byte)EnumMessageType.AllTeachers);
+                    }
+                    else if (user.RoleName == ConstRoles.Personel)
+                    {
+                        query = query.Where(m => m.MessageType == (byte)EnumMessageType.AllPersonel);
+                    }
+
+                    // Also include messages sent to this specific user
+                    var specificMessages = _context.Messages
+                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.Private && !m.IsHidden)
+                        .Where(m => m.MessageRecipients.Any(mr => mr.RecipientUserId == userId));
+
+                    query = query.Union(specificMessages);
+                }
+                else if (chatKey.StartsWith("private_"))
+                {
+                    // Regular private chat
+                    var otherUserIdStr = chatKey.Replace("private_", "");
+                    if (!long.TryParse(otherUserIdStr, out long otherUserId))
+                    {
+                        _logger.LogWarning($"Invalid chatKey format: {chatKey}");
+                        return Enumerable.Empty<MessageDto>();
+                    }
+
+                    query = _context.Messages
+                        .Where(m => m.MessageType == (byte)EnumMessageType.Private && !m.IsSystemMessage && !m.IsHidden)
+                        .Where(m => 
+                            (m.SenderUserId == userId && m.OwnerId == otherUserId) ||
+                            (m.SenderUserId == otherUserId && m.OwnerId == userId) ||
+                            (m.SenderUserId == userId && m.MessagePrivates.Any(mp => mp.GetterUserId == otherUserId)) ||
+                            (m.SenderUserId == otherUserId && m.MessagePrivates.Any(mp => mp.GetterUserId == userId))
+                        );
+                }
+                else
+                {
+                    _logger.LogWarning($"Unknown chatKey format: {chatKey}");
+                    return Enumerable.Empty<MessageDto>();
+                }
+
+                // Apply pagination based on messageId
+                if (messageId > 0)
+                {
+                    if (loadOlder)
+                    {
+                        query = query.Where(m => m.MessageId < messageId);
+                    }
+                    else
+                    {
+                        query = query.Where(m => m.MessageId > messageId);
+                    }
+                }
+
+                // Include related data
+                query = query
+                    .Include(m => m.MessageTexts)
+                    .Include(m => m.SenderUser)
+                    .Include(m => m.MessageReads)
+                    .Include(m => m.ReplyMessage)
+                        .ThenInclude(rm => rm.MessageTexts)
+                    .Include(m => m.ReplyMessage)
+                        .ThenInclude(rm => rm.SenderUser)
+                    .Include(m => m.MessageFiles)
+                        .ThenInclude(mf => mf.FileExtension);
+
+                // Order and take
+                var messages = await query
+                    .OrderByDescending(m => m.MessageDateTime)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                // Map to DTOs
+                var messageDtos = messages.Select(m => new MessageDto
+                {
+                    MessageId = m.MessageId,
+                    MessageDateTime = m.MessageDateTime,
+                    SenderUserId = m.SenderUserId,
+                    IsPin = m.IsPin,
+                    PinnedAt = m.PinnedAt,
+                    PinnedByUserId = m.PinnedByUserId,
+                    IsSystemMessage = m.IsSystemMessage,
+                    IsHidden = m.IsHidden,
+                    MessageType = m.MessageType,
+                    IsEdited = m.IsEdited,
+                    OwnerId = m.OwnerId,
+                    ReceiverUserId = m.OwnerId,
+                    ReplyMessageId = m.ReplyMessageId,
+                    IsReadByCurrentUser = m.MessageReads.Any(mr => mr.UserId == userId),
+                    SenderUser = new UserDto
+                    {
+                        UserId = m.SenderUser.UserId,
+                        NameFamily = m.SenderUser.NameFamily,
+                        ProfilePicName = m.SenderUser.ProfilePicName,
+                        RoleName = m.SenderUser.RoleName,
+                        RoleFaName = m.SenderUser.RoleFaName
+                    },
+                    MessageText = m.MessageTexts.Select(mt => new MessageTextDto
+                    {
+                        MessageTextId = mt.MessageTextId,
+                        MessageTxt = mt.MessageTxt
+                    }).FirstOrDefault(),
+                    ReplyMessage = m.ReplyMessage != null ? new MessageDto
+                    {
+                        MessageId = m.ReplyMessage.MessageId,
+                        MessageDateTime = m.ReplyMessage.MessageDateTime,
+                        SenderUserId = m.ReplyMessage.SenderUserId,
+                        SenderUser = new UserDto
+                        {
+                            UserId = m.ReplyMessage.SenderUser.UserId,
+                            NameFamily = m.ReplyMessage.SenderUser.NameFamily
+                        },
+                        MessageText = m.ReplyMessage.MessageTexts.Select(mt => new MessageTextDto
+                        {
+                            MessageTextId = mt.MessageTextId,
+                            MessageTxt = mt.MessageTxt
+                        }).FirstOrDefault()
+                    } : null,
+                    MessageFiles = m.MessageFiles.Select(mf => new MessageFileDto
+                    {
+                        MessageFileId = mf.MessageFileId,
+                        FileName = mf.FileName,
+                        OriginalFileName = mf.OriginalFileName,
+                        FilePath = mf.FilePath,
+                        FileThumbPath = mf.FileThumbPath,
+                        FileType = mf.FileExtension?.Type,
+                        FileSize = mf.FileSize
+                    }).ToList()
+                }).ToList();
+
+                return messageDtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting private chat messages for user {UserId}, chatKey {ChatKey}", userId, chatKey);
+                return Enumerable.Empty<MessageDto>();
+            }
+        }
 
         #endregion
 

@@ -1,9 +1,11 @@
 @using Messenger.Tools
-@model UserChatModel
+@using Messenger.WebApp.Models.ViewModels
+@model UserChatsViewModel
 
 @{
     var classGroups = Model.Groups;
     var channels = Model.Channels;
+    var privateChats = Model.PrivateChats;
 }
 
 <!-- Saved Messages Item -->
@@ -22,6 +24,53 @@
         </div>
     </a>
 </li>
+
+
+<!-- Private Chats Items -->
+@if (privateChats != null && privateChats.Any())
+{
+    foreach (var item in privateChats)
+    {
+        <li id="@item.ChatKey">
+            <a class="chat-list-box" onclick="GetPrivateChatMessages('@item.ChatKey', '@item.ChatName', @item.LastMessage?.MessageId ?? 0)" style="cursor: pointer;">
+                <div class="chat-list-image">
+                    @if (item.ProfilePicName == "system_icon")
+                    {
+                        <img src="~/assets/media/shared-photos/03.jpg" alt="@item.ChatName" class="rounded-circle">
+                    }
+                    else if (!string.IsNullOrEmpty(item.ProfilePicName))
+                    {
+                        <img src="~/assets/media/avatar/UserIcon.png" width="50" alt="@item.ChatName" class="rounded-circle">
+                    }
+                    else
+                    {
+                        <i class="iconsax icon-btn" data-icon="user"> </i>
+                    }
+                </div>
+                <div class="chat-details">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5 class="name">@item.ChatName</h5>
+                        <h6 id="chatTime_@item.ChatKey">@item.LastMessage?.SentAt.ToString("hh:mm")</h6>
+                    </div>
+                    <div class="content">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <p dir="rtl" class="text-truncate is-rtl" id="chatText_@item.ChatKey">
+                                @if (item.LastMessage != null)
+                                {
+                                    <span>@item.LastMessage?.SenderName:</span>
+                                    @item.LastMessage?.Text
+                                }
+                            </p>
+                            <div class="count @(item.UnreadCount == 0 ? "d-none" : "")" id="unreadCountBadge_@item.ChatKey">
+                                @item.UnreadCount
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </li>
+    }
+}
 
 
 <!-- Chat Groups Items -->

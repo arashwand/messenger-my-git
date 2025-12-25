@@ -49,6 +49,10 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
     @await RenderSectionAsync("Styles", required: false)
+
+    <style>
+       
+    </style>
 </head>
 
 <body>
@@ -56,14 +60,53 @@
     @RenderBody()
 
     <!-- search offcanvas starts -->
-    <div class="offcanvas offcanvas-top search-offcanvas" tabindex="-1" id="search-offcanvas">
+    <div class="offcanvas offcanvas-top search-offcanvas" tabindex="-1" id="search-offcanvas" style="max-width:600px; margin:0 auto;">
         <div class="offcanvas-header">
-            <a href="setting.html" data-bs-dismiss="offcanvas">
-                <i class="iconsax icon-btn" data-icon="chevron-left"> </i>
+            <a href="#" data-bs-dismiss="offcanvas">
+                <i class="iconsax icon-btn" data-icon="chevron-left"></i>
             </a>
-            <div class="form-input">
-                <input type="search" class="form-control search" id="inputusername" placeholder="Search here...">
-                <i class="iconsax search" data-icon="search-normal-2"> </i>
+            <div class="form-input w-100">
+                <input type="search" dir="rtl"
+                       class="form-control search" 
+                       id="searchInput" 
+                       placeholder="جستجو..."
+                       autocomplete="off">
+                <i class="iconsax search" data-icon="search-normal-2"></i>
+            </div>
+        </div>
+
+        <!-- دکمههای رادیویی برای Manager و Personel -->
+        <div class="offcanvas-body" dir="rtl" id="searchOptionsContainer" style="display: none;">
+            <div class="search-type-options" style="padding: 15px;">
+                <h6 style="margin-bottom: 15px; color: rgba(var(--dark-text), 1);">جستجو بر اساس:</h6>
+                
+                <span class="form-check mb-3 d-inline-block">
+                    <input class="form-check-input" 
+                           type="radio" 
+                           name="searchType" 
+                           id="searchByName" 
+                           value="name" 
+                           checked>
+                    <label class="form-check-label" for="searchByName">
+                        نام و نام خانوادگی
+                    </label>
+                </span>
+
+                <span class="form-check d-inline-block">
+                    <input class="form-check-input" 
+                           type="radio" 
+                           name="searchType" 
+                           id="searchByNationalCode" 
+                           value="nationalCode">
+                    <label class="form-check-label" for="searchByNationalCode">
+                        کد ملی
+                    </label>
+                </span>
+            </div>
+
+            <!-- نتایج جستجو -->
+            <div id="searchResults" style="padding: 0 15px 15px;">
+                <!-- نتایج اینجا نمایش داده میشوند -->
             </div>
         </div>
     </div>

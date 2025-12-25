@@ -112,6 +112,43 @@ window.chatMessageManager = (function ($) {
     }
 
     /**
+     * ایجاد پیکربندی AJAX بر اساس نوع چت (Private یا Group/Channel)
+     */
+    function createAjaxConfigForMessages(messageId, isLoadingOlder) {
+        const chatId = parseInt($('#current-group-id-hidden-input').val());
+        const currentGroupType = $('#current-group-type-hidden-input').val();
+        const chatKey = $('#chatKey').val();
+
+        if (currentGroupType === 'Private') {
+            if (!chatKey) {
+                console.error('chatKey not found for private chat');
+                return null;
+            }
+            return {
+                url: isLoadingOlder ? '/Home/GetOlderPrivateChatMessages' : '/Home/GetNewerPrivateChatMessages',
+                type: 'GET',
+                data: {
+                    chatKey: chatKey,
+                    messageId: messageId,
+                    pageSize: 50
+                }
+            };
+        } else {
+            return {
+                url: isLoadingOlder ? '/Home/GetOldMessage' : '/Home/GetNewerMessages',
+                type: isLoadingOlder ? 'POST' : 'GET',
+                data: {
+                    chatId: chatId,
+                    groupType: currentGroupType,
+                    messageId: messageId,
+                    pageSize: 50,
+                    ...(isLoadingOlder && { loadOlder: true, loadBothDirections: false })
+                }
+            };
+        }
+    }
+
+    /**
      * پیام‌های جدیدتر از یک شناسه مشخص را بارگذاری می‌کند (برای پر کردن خلا).
      */
     function getNewerData(startMessageId) {
@@ -123,18 +160,15 @@ window.chatMessageManager = (function ($) {
         console.log(`Fetching newer messages starting after ID: ${startMessageId}`);
         getNewerDataRunning = true;
 
-        const chatId = parseInt($('#current-group-id-hidden-input').val());
-        const currentGroupType = $('#current-group-type-hidden-input').val();
+        // استفاده از تابع کمکی برای ایجاد پیکربندی
+        const ajaxConfig = createAjaxConfigForMessages(startMessageId, false);
+        if (!ajaxConfig) {
+            getNewerDataRunning = false;
+            return Promise.resolve();
+        }
 
         return $.ajax({
-            url: '/Home/GetNewerMessages',
-            type: 'GET',
-            data: {
-                chatId: chatId,
-                groupType: currentGroupType,
-                messageId: startMessageId,
-                pageSize: 50
-            },
+            ...ajaxConfig,
             success: function (response) {
                 if (response.success && response.data.length > 0) {
                     console.log(`✅ Loaded ${response.data.length} newer messages.`);
@@ -276,19 +310,16 @@ window.chatMessageManager = (function ($) {
         }
 
         console.log('last messageId is :' + lastmessageId);
-        const chatId = parseInt($('#current-group-id-hidden-input').val());
-        const currentGroupType = $('#current-group-type-hidden-input').val();
+
+        // استفاده از تابع کمکی برای ایجاد پیکربندی
+        const ajaxConfig = createAjaxConfigForMessages(lastmessageId, true);
+        if (!ajaxConfig) {
+            getOldDataRunning = false;
+            return Promise.resolve();
+        }
 
         return $.ajax({
-            url: '/Home/GetOldMessage',
-            type: 'POST',
-            data: {
-                chatId: chatId,
-                groupType: currentGroupType,
-                messageId: lastmessageId,
-                loadOlder: true,
-                loadBothDirections: false
-            },
+            ...ajaxConfig,
             success: function (response) {
                 if (response.success) {
                     if (response.data.length < 50) {

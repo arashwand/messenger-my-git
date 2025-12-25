@@ -150,6 +150,7 @@ namespace Messenger.Services.Services
 
         /// <summary>
         /// ایجاد کاربر اگر در sso  وجود داشته باشد
+        /// ایدی را میگیرد و اطلاعات را از sso  دریافت میکنه و به دیتابیس مسنجر اضافه میکنه
         /// </summary>
         /// <param name="userId"></param>
         /// <param name="userClaims"></param>
@@ -253,12 +254,29 @@ namespace Messenger.Services.Services
         }
 
 
-        public async Task<IEnumerable<UserDto>> SearchUsersAsync(string query)
+        public async Task<IEnumerable<UserDto>> SearchUsersAsync(string query, string searchType = "name")
         {
-            _logger.LogInformation("Searching users with query: {Query}", query);
-            var userEntities = await _context.Users
-                .Where(u => u.NameFamily.Contains(query) || u.DeptName.Contains(query))
-                .ToListAsync();
+            _logger.LogInformation("Searching users: query={Query}, type={SearchType}", query, searchType);
+            
+            IQueryable<User> usersQuery = _context.Users;
+
+            // جستجو بر اساس نوع
+            if (searchType == "nationalCode")
+            {
+                // TODO: در صورتی که فیلد کد ملی به مدل User اضافه شود، از کد زیر استفاده کنید:
+                // usersQuery = usersQuery.Where(u => u.NationalCode.Contains(query));
+                
+                // فعلاً که فیلد کد ملی وجود ندارد، از جستجوی نام استفاده می‌کنیم
+                _logger.LogWarning("National code search requested but field not available in User model. Falling back to name search.");
+            }
+            
+            // جستجو بر اساس نام (برای هر دو حالت name و nationalCode تا زمانی که فیلد کد ملی اضافه شود)
+            usersQuery = usersQuery.Where(u => 
+                u.NameFamily.Contains(query) || 
+                u.DeptName.Contains(query)
+            );
+
+            var userEntities = await usersQuery.ToListAsync();
 
             return userEntities.Select(s => new UserDto
             {

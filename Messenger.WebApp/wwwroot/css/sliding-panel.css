@@ -13,7 +13,7 @@
     /* --- Fix for Scrolling Issue --- */
     height: 100vh; /* Full viewport height */
     background-color: #fff;
-    z-index: 1050;
+    /*z-index: 1050;*/
     display: flex;
     flex-direction: column;
     /* --- Animation --- */

@@ -34,12 +34,15 @@ namespace Messenger.WebApp.ServiceHelper
             return await response.Content.ReadFromJsonAsync<UserDto>() ?? throw new InvalidOperationException("Failed to retrieve user.");
         }
 
-        public async Task<IEnumerable<UserDto>> SearchUsersAsync(string query)
+        public async Task<IEnumerable<UserDto>> SearchUsersAsync(string query, string searchType = "name")
         {
             if (string.IsNullOrWhiteSpace(query))
                 throw new ArgumentException("Search query cannot be empty.", nameof(query));
 
-            var response = await _httpClient.GetAsync($"api/users/search?query={Uri.EscapeDataString(query)}");
+            // اضافه کردن searchType به query string
+            var url = $"api/users/search?query={Uri.EscapeDataString(query)}&searchType={searchType}";
+            
+            var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
             var users = await response.Content.ReadFromJsonAsync<IEnumerable<UserDto>>();
             return users ?? new List<UserDto>();

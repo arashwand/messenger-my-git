@@ -33,6 +33,8 @@ public partial class User
 
     public virtual ICollection<MessageRead> MessageReads { get; set; } = new List<MessageRead>();
 
+    public virtual ICollection<MessageRecipient> MessageRecipients { get; set; } = new List<MessageRecipient>();
+
     public virtual ICollection<MessageSaved> MessageSaveds { get; set; } = new List<MessageSaved>();
 
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
