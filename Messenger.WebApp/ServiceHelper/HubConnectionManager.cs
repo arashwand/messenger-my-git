@@ -237,49 +237,86 @@ namespace Messenger.WebApp.ServiceHelper
                     _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, ChatKey={ChatKey}, GroupType={GroupType}, SenderId={SenderId}",
                         messageDto.MessageId, messageDto.ChatKey, messageDto.GroupType, messageDto.SenderUserId);
 
-                    // ✅ برای Private messages: محاسبه groupId از دیدگاه کاربر فعلی
-                    // ChatKey از سرور میآید: "private_5_10" یا "ClassGroup_123"
-                    if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                    // ✅ برای Private messages: استخراج chatKey و استفاده از آن برای routing
+                    string chatKey = null;
+                    
+                    if (!string.IsNullOrEmpty(messageDto.ChatKey))
                     {
-                        var currentUserId = GetCurrentUserId();
+                        // اگر ChatKey در messageDto موجود است، از آن استفاده کن
+                        chatKey = messageDto.ChatKey;
                         
-                        if (currentUserId <= 0)
+                        // برای Private: محاسبه groupId برای هر کاربر
+                        if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
                         {
-                            _logger.LogWarning("Cannot determine current user ID for private message routing");
-                            // ادامه با مقادیر پیش‌فرض
-                        }
-                        else
-                        {
-                            // محاسبه otherUserId (کاربر مقابل)
-                            long otherUserId;
-                            if (messageDto.SenderUserId == currentUserId)
-                            {
-                                // من فرستندهام → نمایش در چت با گیرنده
-                                otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
-                            }
-                            else
-                            {
-                                // من گیرندهام → نمایش در چت با فرستنده
-                                otherUserId = messageDto.SenderUserId;
-                            }
+                            var currentUserId = GetCurrentUserId();
                             
-                            if (otherUserId > 0)
+                            if (currentUserId > 0)
                             {
-                                groupId = otherUserId;
-                                groupType = "Private";
+                                // محاسبه otherUserId (کاربر مقابل)
+                                long otherUserId;
+                                if (messageDto.SenderUserId == currentUserId)
+                                {
+                                    // من فرستندهام → نمایش در چت با گیرنده
+                                    otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                                }
+                                else
+                                {
+                                    // من گیرندهام → نمایش در چت با فرستنده
+                                    otherUserId = messageDto.SenderUserId;
+                                }
                                 
-                                _logger.LogInformation($"Private message routed: currentUser={currentUserId}, otherUser={otherUserId}, groupId={groupId}, ChatKey={messageDto.ChatKey}");
+                                if (otherUserId > 0)
+                                {
+                                    groupId = otherUserId;
+                                    groupType = "Private";
+                                    
+                                    _logger.LogInformation($"Private message routed: currentUser={currentUserId}, otherUser={otherUserId}, groupId={groupId}, ChatKey={chatKey}");
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // اگر ChatKey موجود نیست، از روش قدیمی استفاده کن
+                        if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                        {
+                            var currentUserId = GetCurrentUserId();
+                            
+                            if (currentUserId > 0)
+                            {
+                                long otherUserId;
+                                if (messageDto.SenderUserId == currentUserId)
+                                {
+                                    otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                                }
+                                else
+                                {
+                                    otherUserId = messageDto.SenderUserId;
+                                }
+                                
+                                if (otherUserId > 0)
+                                {
+                                    groupId = otherUserId;
+                                    groupType = "Private";
+                                }
                             }
                         }
                     }
 
                     var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType);
 
-                    // ارسال به همه کلاینت‌های WebApp یا به کاربر خاص برای پیام خصوصی
-                    if (messageDto.MessageType == (byte)EnumMessageType.Private && messageDto.ReceiverUserId.HasValue)
+                    // ✅ ارسال به گروه با استفاده از chatKey
+                    if (!string.IsNullOrEmpty(chatKey))
                     {
+                        await _webAppHubContext.Clients.Group(chatKey).SendAsync("ReceiveMessage", payload2);
+                        _logger.LogInformation($"Message forwarded to WebApp group: {chatKey}");
+                    }
+                    else if (messageDto.MessageType == (byte)EnumMessageType.Private && messageDto.ReceiverUserId.HasValue)
+                    {
+                        // Fallback: ارسال به کاربران خاص اگر chatKey موجود نبود
                         await _webAppHubContext.Clients.User(messageDto.ReceiverUserId.Value.ToString()).SendAsync("ReceiveMessage", payload2);
-                        await _webAppHubContext.Clients.User(messageDto.SenderUserId.ToString()).SendAsync("ReceiveMessage", payload2); // ارسال به فرستنده هم
+                        await _webAppHubContext.Clients.User(messageDto.SenderUserId.ToString()).SendAsync("ReceiveMessage", payload2);
+                        _logger.LogInformation($"Message forwarded to users (fallback): {messageDto.ReceiverUserId}, {messageDto.SenderUserId}");
                     }
                     else
                     {
