@@ -58,6 +58,41 @@ window.chatApp = (function ($) {
         }
     }
 
+    // تابع محاسبه و تنظیم activeGroupId
+    function initializeActiveGroupId() {
+        const chatId = parseInt($('#current-group-id-hidden-input').val());
+        const groupType = $('#current-group-type-hidden-input').val();
+        const chatKey = $('#chatKey').val();
+        
+        let activeChatKey;
+        
+        if (groupType === 'Private' && chatKey) {
+            // برای Private: استفاده از chatKey از سرور
+            activeChatKey = chatKey;
+            console.log(`📍 Private chat initialized: ChatKey=${activeChatKey}`);
+        } else if (groupType === 'Private' && chatId) {
+            // fallback: محاسبه chatKey اگر در سرور تنظیم نشده
+            const currentUserId = parseInt($('#userId').val());
+            const otherUserId = chatId;
+            const minId = Math.min(currentUserId, otherUserId);
+            const maxId = Math.max(currentUserId, otherUserId);
+            activeChatKey = `private_${minId}_${maxId}`;
+            console.log(`📍 Private chat initialized (computed): ChatKey=${activeChatKey} (current=${currentUserId}, other=${otherUserId})`);
+        } else if (groupType && chatId) {
+            // برای Group/Channel
+            activeChatKey = `${groupType}_${chatId}`;
+            console.log(`📍 Group chat initialized: ChatKey=${activeChatKey}`);
+        } else {
+            console.warn('⚠️ Could not initialize activeGroupId - missing chat information');
+            activeChatKey = null;
+        }
+        
+        // تنظیم global variable
+        window.activeGroupId = activeChatKey;
+        
+        return activeChatKey;
+    }
+
     // =================================================
     //                 PUBLIC API
     // =================================================
@@ -79,6 +114,13 @@ window.chatApp = (function ($) {
         },
 
         /**
+         * محاسبه و تنظیم activeGroupId برای فیلتر کردن پیامها
+         */
+        initializeActiveGroupId: function () {
+            return initializeActiveGroupId();
+        },
+
+        /**
          * ماژول چت را راه‌اندازی کرده و به SignalR متصل می‌شود.
          */
         init: function () {
@@ -91,6 +133,9 @@ window.chatApp = (function ($) {
                 return;
             }
             currentUser = parseInt(currentUser);
+
+            // ✅ تنظیم activeGroupId برای فیلتر کردن پیامها
+            publicApi.initializeActiveGroupId();
 
             signalRConnection = new signalR.HubConnectionBuilder()
                 .withUrl("/webappchathub")

@@ -479,7 +479,34 @@ namespace Messenger.API.Hubs
 
             if (!string.IsNullOrEmpty(request.ClientMessageId)) savedMessageDto.ClientMessageId = request.ClientMessageId;
 
-            var groupKey = GenerateSignalRGroupKey.GenerateKey(request.GroupId, request.GroupType);
+            // محاسبه groupKey و تنظیم ChatKey
+            string groupKey;
+            
+            if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
+            {
+                // برای Private: استفاده از PrivateChatHelper
+                var senderId = request.UserId;
+                var receiverId = request.GroupId; // در Private، GroupId همان otherUserId است
+                
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
+                
+                // تنظیم ChatKey و GroupType
+                savedMessageDto.ChatKey = groupKey;
+                savedMessageDto.GroupType = "Private";
+                
+                _logger.LogInformation($"Private message: SenderId={senderId}, ReceiverId={receiverId}, ChatKey={groupKey}");
+            }
+            else
+            {
+                // برای Group/Channel
+                groupKey = GenerateSignalRGroupKey.GenerateKey(request.GroupId, request.GroupType);
+                
+                savedMessageDto.ChatKey = groupKey;
+                savedMessageDto.GroupType = request.GroupType;
+                savedMessageDto.GroupId = request.GroupId;
+                
+                _logger.LogInformation($"Group message: GroupId={request.GroupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
+            }
 
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
                 groupKey,

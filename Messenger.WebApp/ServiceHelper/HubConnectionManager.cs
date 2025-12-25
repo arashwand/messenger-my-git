@@ -234,10 +234,11 @@ namespace Messenger.WebApp.ServiceHelper
                         return;
                     }
 
-                    _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, Type={Type}, GroupType={GroupType}, SenderId={SenderId}",
-                        messageDto.MessageId, messageDto.MessageType, messageDto.GroupType, messageDto.SenderUserId);
+                    _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, ChatKey={ChatKey}, GroupType={GroupType}, SenderId={SenderId}",
+                        messageDto.MessageId, messageDto.ChatKey, messageDto.GroupType, messageDto.SenderUserId);
 
                     // ✅ برای Private messages: محاسبه groupId از دیدگاه کاربر فعلی
+                    // ChatKey از سرور میآید: "private_5_10" یا "ClassGroup_123"
                     if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
                     {
                         var currentUserId = GetCurrentUserId();
@@ -267,7 +268,7 @@ namespace Messenger.WebApp.ServiceHelper
                                 groupId = otherUserId;
                                 groupType = "Private";
                                 
-                                _logger.LogInformation($"Private message routed: currentUser={currentUserId}, otherUser={otherUserId}, groupId={groupId}");
+                                _logger.LogInformation($"Private message routed: currentUser={currentUserId}, otherUser={otherUserId}, groupId={groupId}, ChatKey={messageDto.ChatKey}");
                             }
                         }
                     }
