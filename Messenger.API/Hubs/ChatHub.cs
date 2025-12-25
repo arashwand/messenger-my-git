@@ -522,11 +522,33 @@ namespace Messenger.API.Hubs
                 await Clients.User(savedMessageDto.SenderUserId.ToString()).SendAsync("MessageSentSuccessfully", savedMessageDto);
 
             var chatMessageDto = new ChatMessageDto { MessageId = savedMessageDto.MessageId, SenderId = savedMessageDto.SenderUserId, SenderName = savedMessageDto.SenderUser?.NameFamily ?? string.Empty, SentAt = savedMessageDto.MessageDateTime, Text = savedMessageDto.MessageText?.MessageTxt };
-            await _redisLastMessage.SetLastMessageAsync(request.GroupType, savedMessageDto.OwnerId.ToString(), chatMessageDto);
+            
+            // ✅ برای Private: استفاده از groupKey (chatKey) به جای OwnerId
+            if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
+            {
+                await _redisLastMessage.SetLastMessageAsync(request.GroupType, groupKey, chatMessageDto);
+            }
+            else
+            {
+                await _redisLastMessage.SetLastMessageAsync(request.GroupType, savedMessageDto.OwnerId.ToString(), chatMessageDto);
+            }
 
-            var members = request.GroupType == ConstChat.ClassGroupType ?
-                await _classGroupService.GetClassGroupMembersInternalAsync(savedMessageDto.OwnerId) :
-                await _channelService.GetChannelMembersInternalAsync(savedMessageDto.OwnerId);
+            // ✅ برای Private: فقط یک گیرنده وجود دارد، برای Group/Channel: لیست اعضا را دریافت کن
+            IEnumerable<UserDto> members;
+            if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
+            {
+                // برای Private: فقط گیرنده را در نظر بگیر
+                var receiverId = request.GroupId; // در Private، GroupId همان receiverId است
+                members = new[] { new UserDto { UserId = receiverId } };
+            }
+            else if (request.GroupType == ConstChat.ClassGroupType)
+            {
+                members = await _classGroupService.GetClassGroupMembersInternalAsync(savedMessageDto.OwnerId);
+            }
+            else
+            {
+                members = await _channelService.GetChannelMembersInternalAsync(savedMessageDto.OwnerId);
+            }
 
             var targetId = savedMessageDto.OwnerId;
             var tasks = new List<Task>();
