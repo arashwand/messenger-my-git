@@ -360,7 +360,26 @@ namespace Messenger.WebApp.Controllers
                     loadBothDirections: false
                 );
 
+                // ✅ تنظیم نام چت بر اساس نوع
+                string chatName = "چت";
+                if (groupType == ConstChat.PrivateType)
+                {
+                    var otherUser = await _userService.GetUserByIdAsync(chatId);
+                    chatName = otherUser?.NameFamily ?? "کاربر";
+                }
+                else if (groupType == ConstChat.ClassGroupType)
+                {
+                    var group = await _classGroupServiceClient.GetClassGroupByIdAsync(chatId);
+                    chatName = group?.LevelName ?? "گروه";
+                }
+                else if (groupType == ConstChat.ChannelGroupType)
+                {
+                    var channel = await _channelServiceClient.GetChannelByIdAsync(chatId);
+                    chatName = channel?.ChannelName ?? "کانال";
+                }
+
                 ViewData["chatGroupId"] = chatId;
+                ViewData["chatName"] = chatName; // ✅ اضافه شد
                 ViewData["baseUrl"] = _baseUrl;
                 ViewData["chatType"] = groupType;
 

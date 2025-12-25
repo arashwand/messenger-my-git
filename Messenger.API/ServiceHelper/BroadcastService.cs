@@ -508,5 +508,77 @@ namespace Messenger.API.ServiceHelper
             }
         }
 
+        /// <summary>
+        /// ارسال پیام خصوصی از طریق SignalR Group
+        /// </summary>
+        public async Task SendPrivateMessageBroadcastAsync(MessageDto messageDto, long senderUserId, long receiverUserId)
+        {
+            var privateChatGroupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderUserId, receiverUserId);
+            
+            // ارسال به گروه SignalR
+            await _hubContext.Clients.Group(privateChatGroupKey)
+                .SendAsync("ReceiveMessage", messageDto);
+            
+            // ذخیره‌سازی آخرین پیام در Redis
+            await _redisLastMessage.SetLastMessageAsync("private", privateChatGroupKey, new ChatMessageDto
+            {
+                Text = messageDto.MessageText?.MessageTxt,
+                SentAt = messageDto.MessageDateTime,
+                SenderName = messageDto.SenderUser?.NameFamily
+            });
+        }
+
+        /// <summary>
+        /// ارسال پیام سیستمی به گروههای مختلف
+        /// </summary>
+        public async Task SendSystemMessageBroadcastAsync(
+            MessageDto messageDto, 
+            EnumMessageType messageType, 
+            long? targetGroupId = null,
+            List<long>? specificUserIds = null)
+        {
+            string signalRGroup = messageType switch
+            {
+                // پیام در گروه خاص
+                EnumMessageType.Group when targetGroupId.HasValue 
+                    => $"ClassGroup_{targetGroupId.Value}",
+                    
+                // پیام در کانال خاص
+                EnumMessageType.Channel when targetGroupId.HasValue 
+                    => $"ChannelGroup_{targetGroupId.Value}",
+                    
+                // پیام به همه دانشجویان
+                EnumMessageType.AllStudents 
+                    => "role_students",
+                    
+                // پیام به همه معلمان
+                EnumMessageType.AllTeachers 
+                    => "role_teachers",
+                    
+                // پیام به همه پرسنل
+                EnumMessageType.AllPersonel 
+                    => "role_personnel",
+                    
+                _ => null
+            };
+            
+            if (signalRGroup != null)
+            {
+                // ارسال به یک گروه
+                await _hubContext.Clients.Group(signalRGroup)
+                    .SendAsync("ReceiveSystemMessage", messageDto);
+            }
+            else if (messageType == EnumMessageType.Private && specificUserIds != null)
+            {
+                // ارسال به افراد خاص (پیامهای انبوه خصوصی)
+                foreach (var userId in specificUserIds)
+                {
+                    var systemChatKey = PrivateChatHelper.GenerateSystemChatGroupKey(userId);
+                    await _hubContext.Clients.Group(systemChatKey)
+                        .SendAsync("ReceiveSystemMessage", messageDto);
+                }
+            }
+        }
+
     }
 }
