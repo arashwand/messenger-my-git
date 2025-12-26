@@ -172,6 +172,8 @@
             }
         }
 
+        var chatSelectedTitle = "";
+
         function pushChatToUrl(groupType, chatId) {
             try {
                 let chatParam;
@@ -392,7 +394,7 @@
             // When a private chat is selected
             window.GetPrivateChatMessages = function(otherUserId, chatName, lastReadMessageId) {
                 console.log(`Loading private chat with user ${otherUserId}, name: ${chatName}`);
-                
+                chatSelectedTitle = chatName;
                 // استفاده مستقیم از تابع موجود GetSelectedChatMessages
                 // برای private messages، chatId = otherUserId (که OwnerId است)
                 window.GetSelectedChatMessages(otherUserId, 'Private', lastReadMessageId);
@@ -524,13 +526,13 @@
             findAndLoadPinnedMessages();
         }
 
-        var chatSelectedTitle = "";
+       
 
         function ChatActivated(chatId, groupType) {
             console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
             var selectedChat = $(`#${groupType}_${chatId}`);
 
-            chatSelectedTitle = selectedChat. find('.name').text();
+            chatSelectedTitle = selectedChat.find('.name').text();
             console.log('---' + chatSelectedTitle);
 
             // ✅ ساخت صحیح selectedChatId

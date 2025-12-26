@@ -70,20 +70,20 @@ namespace Messenger.WebApp.Controllers
 
             if (!result.IsValid)
             {
-                return Content("پیام شما حاوی کلمات نامناسب است "+" [" + result.FoundBadWords.First()+" ]");
+                return Content("پیام شما حاوی کلمات نامناسب است " + " [" + result.FoundBadWords.First() + " ]");
 
                 //return BadRequest(new
                 //{
-                    //Error = "پیام شما حاوی کلمات نامناسب است",
-                    //DetectedWords = result.FoundBadWords
+                //Error = "پیام شما حاوی کلمات نامناسب است",
+                //DetectedWords = result.FoundBadWords
                 //});
             }
 
             // اگر بخواهید پیام را سانسور شده ذخیره کنید:
             // var cleanText = _filter.CensorMessage(text);
 
-            
-            
+
+
 
             return Content("clean text");
         }
@@ -173,9 +173,9 @@ namespace Messenger.WebApp.Controllers
             chatModel.Groups = userGroups.ToList();
             chatModel.Channels = userChannels.ToList();
             chatModel.PrivateChats = privateChats.ToList();
-            
+
             ViewData["baseUrl"] = _baseUrl;
-            
+
             return PartialView("_classGroups", chatModel);
 
         }
@@ -353,7 +353,8 @@ namespace Messenger.WebApp.Controllers
                 if (groupType.Contains("private"))
                 {
                     groupType = ConstChat.PrivateType;
-                }else if (groupType.Contains("classgroup"))
+                }
+                else if (groupType.Contains("classgroup"))
                 {
                     groupType = ConstChat.ClassGroupType;
                 }
@@ -361,32 +362,28 @@ namespace Messenger.WebApp.Controllers
                 {
                     groupType = ConstChat.ChannelGroupType;
                 }
-                else
-                {
-                    return BadRequest("chat type not found in claims.");
-                }
 
-                    // دریافت پیامهای اولیه بدون شناخت یک پیام هدف
-                    // سرور خود تصمیم میگیرد که کدام پیامها را بفرستد
-                    var messages = await _messageService.GetChatMessagesAsync(
-                        chatId,
-                        groupType,
-                        pageNumber,
-                        pageSize,
-                        messageId: 0,  // عدم تعیین پیام خاص
-                        loadOlder: false,
-                        loadBothDirections: false
-                    );
+                // دریافت پیامهای اولیه بدون شناخت یک پیام هدف
+                // سرور خود تصمیم میگیرد که کدام پیامها را بفرستد
+                var messages = await _messageService.GetChatMessagesAsync(
+                    chatId,
+                    groupType,
+                    pageNumber,
+                    pageSize,
+                    messageId: 0,  // عدم تعیین پیام خاص
+                    loadOlder: false,
+                    loadBothDirections: false
+                );
 
                 // ✅ تنظیم نام چت بر اساس نوع
                 string chatName = "چت";
                 string chatKey = "";
-                
+
                 if (groupType == ConstChat.PrivateType)
                 {
                     var otherUser = await _userService.GetUserByIdAsync(chatId);
                     chatName = otherUser?.NameFamily ?? "کاربر";
-                    
+
                     // محاسبه chatKey برای Private
                     if (long.TryParse(userId, out var currentUserId))
                     {
