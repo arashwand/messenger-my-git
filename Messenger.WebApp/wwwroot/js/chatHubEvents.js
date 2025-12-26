@@ -512,8 +512,14 @@ $(document).ready(function () {
 
     //  رویداد کلیک برای دکمه ارسال پیام
     $(document).off('click', '#send-message-button, .send-btn').on('click', '#send-message-button, .send-btn', function () {
-        const groupId = parseInt($('#current-group-id-hidden-input').val());
         const groupType = $('#current-group-type-hidden-input').val();
+        let groupId;
+
+        if (groupType === 'Private') {
+            groupId = $('#current-group-id-hidden-input').val();
+        } else {
+            groupId = parseInt($('#current-group-id-hidden-input').val());
+        }
 
         console.log('groupType==================== ' + groupType);
         // ---- ارسال پیام صوتی ----
@@ -571,7 +577,8 @@ $(document).ready(function () {
             const fileUploadedIds = collectServerIdsFromContainer('#uploadedFileIds');
 
             // اگر متنی برای ارسال وجود ندارد و فایلی هم نیست، خارج شو
-            if ((!messageText && fileUploadedIds.length === 0) || !(groupId > 0)) {
+            const isGroupIdValid = (groupType === 'Private' && groupId) || (groupType !== 'Private' && groupId > 0);
+            if ((!messageText && fileUploadedIds.length === 0) || !isGroupIdValid) {
                 return;
             }
 
