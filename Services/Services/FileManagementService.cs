@@ -806,7 +806,7 @@ namespace Messenger.Services.Services
         }
 
 
-        public async Task<SharedContentDto> GetSharedContentForChatAsync(int chatId, string groupType)
+        public async Task<SharedContentDto> GetSharedContentForChatAsync(long chatId, string groupType)
         {
             var sharedContent = new SharedContentDto();
 
