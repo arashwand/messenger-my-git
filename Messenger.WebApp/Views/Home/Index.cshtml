@@ -213,113 +213,23 @@
 
         // Safe invoker that waits if window.GetSelectedChatMessages isn't defined yet
                // جایگزین تابع safeInvokeGetSelected قبلی با این نسخه
-        function safeInvokeGetSelected(paramA, paramB) {
-            // helper: تشخیص اینکه رشته یک id عددی یا composite مثل "1_124644" است
-            function isNumericOrComposite(s) {
-                return /^\d+(?:_\d+)*$/.test((s || '').toString().trim());
+         function safeInvokeGetSelected(chatId, groupType) {
+            if (typeof window.GetSelectedChatMessages === 'function') {
+                try { window.GetSelectedChatMessages(chatId, groupType); } catch (err) { console.error(err); }
+                return;
             }
-
-            try {
-                let groupType = null;
-                let chatId = null;
-
-                // حالت: فقط یک پارامتر داده شده (مثلاً token کامل "private_1_124644" یا "ClassGroup_2")
-                if (typeof paramB === 'undefined' || paramB === null) {
-                    const token = (paramA || '').toString().trim();
-                    if (!token) {
-                        console.warn('safeInvokeGetSelected: empty token');
-                        return;
-                    }
-                    const parts = token.split('_').map(p => (p || '').trim()).filter(Boolean);
-                    if (parts.length >= 2) {
-                        if (parts[0].toLowerCase() === 'private' && parts.length >= 3) {
-                            groupType = parts[0];
-                            chatId = parts.slice(1).join('_'); // '1_124644'
-                        } else {
-                            groupType = parts[0];
-                            chatId = parts.slice(1).join('_');
-                        }
-                    } else {
-                        console.warn('safeInvokeGetSelected: invalid token format', token);
-                        return;
-                    }
-                } else {
-                    // حالت: دو پارامتر داده شده (ممکن است ترتیب گروه/آی‌دی swap شده باشد)
-                    const a = (paramA || '').toString().trim();
-                    const b = (paramB || '').toString().trim();
-
-                    // اگر یکی composite عددی است (مثلاً '1_124644') و دیگری غیرعددی => composite = chatId
-                    const aIsNumComp = isNumericOrComposite(a);
-                    const bIsNumComp = isNumericOrComposite(b);
-
-                    if (!a && !b) {
-                        console.warn('safeInvokeGetSelected: both params empty');
-                        return;
-                    }
-
-                    // حالت واضح: a غیرعددی (groupType) و b عددی/کامپوزیت (chatId)
-                    if (!/^\d+$/.test(a) && (bIsNumComp || /^\d+$/.test(b))) {
-                        groupType = a;
-                        chatId = b;
-                    }
-                    // حالت معکوس: b غیرعددی و a عددی/کامپوزیت
-                    else if (!/^\d+$/.test(b) && (aIsNumComp || /^\d+$/.test(a))) {
-                        groupType = b;
-                        chatId = a;
-                    }
-                    // اگر هر دو شامل underscore و یکی از آنها با 'private' شروع می‌شود
-                    else if (a.toLowerCase().startsWith('private')) {
-                        const parts = a.split('_').map(p => (p || '').trim()).filter(Boolean);
-                        groupType = parts[0];
-                        chatId = parts.slice(1).join('_');
-                    } else if (b.toLowerCase().startsWith('private')) {
-                        const parts = b.split('_').map(p => (p || '').trim()).filter(Boolean);
-                        groupType = parts[0];
-                        chatId = parts.slice(1).join('_');
-                    } else {
-                        // fallback: اولی را گروه و دومی را آی‌دی در نظر بگیر
-                        groupType = a;
-                        chatId = b;
-                    }
-                }
-
-                // در اینجا groupType و chatId به‌صورت normalized باید مقداردهی شده باشند
-                if (!groupType || !chatId) {
-                    console.warn('safeInvokeGetSelected: failed to determine groupType/chatId', { paramA, paramB });
-                    return;
-                }
-
-                // اگر GetSelectedChatMessages هنوز آماده نیست، مثل قبل منتظر می‌مانیم
+            let tries = 0;
+            const iv = setInterval(() => {
                 if (typeof window.GetSelectedChatMessages === 'function') {
-                    try {
-                        window.GetSelectedChatMessages(chatId, groupType);
-                    } catch (err) {
-                        console.error('safeInvokeGetSelected: GetSelectedChatMessages threw', err);
-                    }
+                    clearInterval(iv);
+                    try { window.GetSelectedChatMessages(chatId, groupType); } catch (err) { console.error(err); }
                     return;
                 }
-
-                // fallback: polling مشابه نسخهٔ قبل، اما با پارامترهای نرمالایز شده
-                let tries = 0;
-                const iv = setInterval(() => {
-                    if (typeof window.GetSelectedChatMessages === 'function') {
-                        clearInterval(iv);
-                        try {
-                            window.GetSelectedChatMessages(chatId, groupType);
-                        } catch (err) {
-                            console.error('safeInvokeGetSelected: GetSelectedChatMessages threw after wait', err);
-                        }
-                        return;
-                    }
-                    if (++tries > 50) {
-                        clearInterval(iv);
-                        console.warn('GetSelectedChatMessages not available after waiting.');
-                    }
-                }, 50);
-
-            } catch (e) {
-                console.error('safeInvokeGetSelected error', e);
-            }
+                if (++tries > 50) {
+                    clearInterval(iv);
+                    console.warn('GetSelectedChatMessages not available after waiting.');
+                }
+            }, 50);
         }
 
         $(document).ready(function () {
