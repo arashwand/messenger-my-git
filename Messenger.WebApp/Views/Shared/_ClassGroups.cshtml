@@ -32,7 +32,7 @@
     foreach (var item in privateChats)
     {
         <li id="@item.ChatKey">
-            <a class="chat-list-box" onclick="GetPrivateChatMessages(@item.ChatId, '@item.ChatName', @(item.LastMessage?.MessageId ?? 0))" style="cursor: pointer;">
+    <a class="chat-list-box" onclick="GetPrivateChatMessages('@item.ChatKey', '@item.ChatName', @(item.LastMessage?.MessageId ?? 0))" style="cursor: pointer;">
                 <div class="chat-list-image">
                     @if (item.ProfilePicName == "system_icon")
                     {

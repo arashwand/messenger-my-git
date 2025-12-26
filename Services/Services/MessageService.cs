@@ -805,22 +805,29 @@ namespace Messenger.Services.Services
         /// <param name="pageSize"></param>
         /// <param name="messageId">برای صفحه بندی کاربرد دارد و ایدی قدیمی ترین پیامی که کاربر جاری دریافت کرده  را نمایش میدهد</param>
         /// <returns></returns>
-        public async Task<IEnumerable<MessageDto>> GetChatMessages(long chatId,
+        public async Task<IEnumerable<MessageDto>> GetChatMessages(string chatId,
             string chatType, long currentUserId, int pageNumber, int pageSize,
             long messageId, bool loadOlder = false, bool loadBothDirections = false)
         {
             try
             {
+                long targetId = 0;
                 // Access check (skip for Private since OwnerId ensures access)
                 if (chatType != ConstChat.PrivateType)
                 {
+                    if (!long.TryParse(chatId, out targetId))
+                    {
+                        _logger.LogWarning($"Invalid chatId for group/channel chat: {chatId}");
+                        return new List<MessageDto>();
+                    }
+
                     var hasAccess = chatType == ConstChat.ClassGroupType ?
-                        await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, chatId)
-                        : await _channelService.IsUserMemberOfChannelAsync(currentUserId, chatId);
+                        await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, targetId)
+                        : await _channelService.IsUserMemberOfChannelAsync(currentUserId, targetId);
 
                     if (!hasAccess)
                     {
-                        _logger.LogWarning($"User {currentUserId} does not have access to chat {chatId}");
+                        _logger.LogWarning($"User {currentUserId} does not have access to chat {targetId}");
                         return new List<MessageDto>();
                     }
                 }
@@ -835,10 +842,37 @@ namespace Messenger.Services.Services
                     _ => throw new ArgumentException($"Unsupported chat type: {chatType}")
                 };
 
-                // For Private chats, chatId is the other user's ID, so pass currentUserId as well
-                var baseQuery = chatType == ConstChat.PrivateType 
-                    ? GetMessagesQuery(chatId, chatEnumType, currentUserId)
-                    : GetMessagesQuery(chatId, chatEnumType);
+                IQueryable<Message> baseQuery;
+                if (chatType == ConstChat.PrivateType)
+                {
+                    if (!Guid.TryParse(chatId, out var conversationId))
+                    {
+                        _logger.LogWarning($"Invalid GUID for private chat: {chatId}");
+                        return new List<MessageDto>();
+                    }
+
+                    var conversation = await _context.PrivateChatConversations
+                        .FirstOrDefaultAsync(c => c.ConversationId == conversationId);
+
+                    if (conversation == null)
+                    {
+                        _logger.LogWarning($"Conversation not found for GUID: {chatId}");
+                        return new List<MessageDto>();
+                    }
+
+                    if (conversation.User1Id != currentUserId && conversation.User2Id != currentUserId)
+                    {
+                        _logger.LogWarning($"User {currentUserId} does not have access to conversation {chatId}");
+                        return new List<MessageDto>();
+                    }
+
+                    targetId = conversation.User1Id == currentUserId ? conversation.User2Id : conversation.User1Id;
+                    baseQuery = GetMessagesQuery(targetId, chatEnumType, currentUserId);
+                }
+                else
+                {
+                    baseQuery = GetMessagesQuery(targetId, chatEnumType);
+                }
                 if (baseQuery == null)
                     return new List<MessageDto>();
 
@@ -2417,10 +2451,26 @@ namespace Messenger.Services.Services
                             !m.MessageReads.Any(mr => mr.UserId == userId))
                         .CountAsync();
 
+                    var conversation = await _context.PrivateChatConversations
+                        .FirstOrDefaultAsync(c => (c.User1Id == userId && c.User2Id == chat.OtherUserId) || (c.User1Id == chat.OtherUserId && c.User2Id == userId));
+
+                    if (conversation == null)
+                    {
+                        conversation = new PrivateChatConversation
+                        {
+                            ConversationId = Guid.NewGuid(),
+                            User1Id = userId,
+                            User2Id = chat.OtherUserId
+                        };
+                        _context.PrivateChatConversations.Add(conversation);
+                        await _context.SaveChangesAsync();
+                    }
+
                     privateChats.Add(new PrivateChatItemDto
                     {
+                        ConversationId = conversation.ConversationId,
                         ChatId = chat.OtherUserId,
-                        ChatKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, chat.OtherUserId), // ✅ استفاده از Helper
+                        ChatKey = conversation.ConversationId.ToString(),
                         ChatName = otherUser.NameFamily,
                         ProfilePicName = otherUser.ProfilePicName,
                         LastMessage = new ChatMessageDto

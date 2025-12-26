@@ -1,7 +1,10 @@
 namespace Messenger.DTOs;
 
+using System;
+
 public class PrivateChatItemDto
 {
+    public Guid ConversationId { get; set; }
     public long ChatId { get; set; }
     public string ChatKey { get; set; } = string.Empty;
     public string ChatName { get; set; } = string.Empty;

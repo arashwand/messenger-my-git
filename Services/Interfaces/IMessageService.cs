@@ -42,7 +42,7 @@ namespace Messenger.Services.Interfaces
         Task<IEnumerable<MessageDto>> GetPrivateMessagesAsync(long userId1, long userId2, int pageNumber, int pageSize);
         Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, long currentUserId, int pageNumber, int pageSize);
 
-        Task<IEnumerable<MessageDto>> GetChatMessages(long chatId,
+        Task<IEnumerable<MessageDto>> GetChatMessages(string chatId,
         string chatType, long currentUserId, int pageNumber, int pageSize,
             long messageId, bool loadOlder = false, bool loadBothDirections = false);
 

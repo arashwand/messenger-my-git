@@ -172,37 +172,13 @@
             }
         }
 
-        var chatSelectedTitle = "";
-                // guard to avoid repeated restore
-        window.__chatRestoreDone = window.__chatRestoreDone || false;
-
         function pushChatToUrl(groupType, chatId) {
             try {
-                let chatParam;
-                const typeLower = (groupType || '').toString().toLowerCase();
-
-                if (typeLower === 'private') {
-                    const currentUserId = parseInt($('#userId').val());
-                    const otherUserId = parseInt(chatId);
-                    const minId = Math.min(currentUserId, otherUserId);
-                    const maxId = Math.max(currentUserId, otherUserId);
-                    chatParam = `private_${minId}_${maxId}`;
-                } else {
-                    chatParam = `${groupType}_${chatId}`;
-                }
+                let chatParam = `${groupType}_${chatId}`;
 
                 const url = new URL(window.location.href);
-                const currentParam = url.searchParams.get('chat') || '';
-                // if URL already has same param and history.state.chat is same, skip push
-                const state = window.history.state || {};
-                if (currentParam === chatParam && state.chat === chatParam) {
-                    // nothing to do
-                    return;
-                }
-
                 url.searchParams.set('chat', chatParam);
-                const newState = { chat: chatParam, title: (chatSelectedTitle || '') };
-                window.history.pushState(newState, '', url);
+                window.history.pushState({ chat: chatParam }, '', url);
             } catch (e) {
                 console.error('pushChatToUrl error:', e);
             }
@@ -260,43 +236,7 @@
                     // - If private chat (private_{id1}_{id2}) keep the full id part as "id1_id2"
                     // - Otherwise try to detect canonical order; fallback to join remaining parts
                     let groupType = parts[0];
-                    let chatId = null;
-
-                    if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
-                        const currentUserId = parseInt($('#userId').val());
-                        const id1 = parseInt(parts[1]);
-                        const id2 = parseInt(parts[2]);
-
-                        if (!isNaN(currentUserId) && !isNaN(id1) && !isNaN(id2)) {
-                            // Find the other user's ID
-                            const otherUserId = currentUserId === id1 ? id2 : id1;
-                            chatId = otherUserId.toString();
-                            console.log('--private-- receiverId :', chatId);
-                        } else {
-                            // Fallback or error handling if IDs are not numbers
-                            chatId = parts.slice(1).join('_');
-                            console.error('Could not parse private chat user IDs.');
-                        }
-                    } else if (parts.length === 2) {
-                        // Normal case like ClassGroup_2
-                        const a = parts[0], b = parts[1];
-                        
-                        if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                            groupType = a; chatId = b;
-                        } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                            // swapped like 2_ClassGroup  -> normalize
-                            groupType = b; chatId = a;
-                        } else {
-                            // ambiguous, keep as-is
-                            groupType = a; chatId = b;
-                        }
-                        console.log('--ClassGroup or channel-----------------------------chatid :', b);
-                    } else {
-                        // Fallback for other multi-part ids: use first as groupType and join the rest
-                        groupType = parts[0];
-                        chatId = parts.slice(1).join('_');
-                        console.log('--multi-part ids-----------------------------chatid :', chatId);
-                    }
+                    let chatId = parts.slice(1).join('_');
 
                     // invoke loading with canonical groupType/chatId
                     safeInvokeGetSelected(chatId, groupType);
@@ -375,7 +315,6 @@
                         $('.hide-on-chat-select').addClass('slide-out');
 
                         GetPinnedChats(chatId, groupType);
-                        restoreChatFromUrlIfNeeded();
                     },
                     error: function (error) {
                         console.error("Error fetching chat messages:", error);
@@ -404,12 +343,9 @@
             };
 
             // When a private chat is selected
-            window.GetPrivateChatMessages = function(otherUserId, chatName, lastReadMessageId) {
-                console.log(`Loading private chat with user ${otherUserId}, name: ${chatName}`);
-                chatSelectedTitle = chatName;
-                // استفاده مستقیم از تابع موجود GetSelectedChatMessages
-                // برای private messages، chatId = otherUserId (که OwnerId است)
-                window.GetSelectedChatMessages(otherUserId, 'Private', lastReadMessageId);
+            window.GetPrivateChatMessages = function(chatKey, chatName, lastReadMessageId) {
+                console.log(`Loading private chat with key ${chatKey}, name: ${chatName}`);
+                window.GetSelectedChatMessages(chatKey, 'Private', lastReadMessageId);
             };
 
             // When closing the chat view to go back to the list
@@ -440,34 +376,7 @@
                         // - If private chat (private_{id1}_{id2}) keep the full id part as "id1_id2"
                         // - Otherwise detect canonical order or fallback to join remaining parts
                         let groupType = parts[0];
-                        let chatId = null;
-
-                        if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
-                            const currentUserId = parseInt($('#userId').val());
-                            const id1 = parseInt(parts[1]);
-                            const id2 = parseInt(parts[2]);
-
-                            if (!isNaN(currentUserId) && !isNaN(id1) && !isNaN(id2)) {
-                                const otherUserId = currentUserId === id1 ? id2 : id1;
-                                chatId = otherUserId.toString();
-                            } else {
-                                chatId = parts.slice(1).join('_');
-                                console.error('Could not parse private chat user IDs from popstate.');
-                            }
-                        } else if (parts.length === 2) {
-                            const a = parts[0], b = parts[1];
-                            if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                                groupType = a; chatId = b;
-                            } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                                groupType = b; chatId = a;
-                            } else {
-                                groupType = a; chatId = b;
-                            }
-                        } else {
-                            // fallback for other multi-part ids
-                            groupType = parts[0];
-                            chatId = parts.slice(1).join('_');
-                        }
+                        let chatId = parts.slice(1).join('_');
 
                         safeInvokeGetSelected(chatId, groupType);
                     }
@@ -538,42 +447,16 @@
             findAndLoadPinnedMessages();
         }
 
-       
+        var chatSelectedTitle = "";
 
         function ChatActivated(chatId, groupType) {
-            // console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
-            // var selectedChat = $(`#${groupType}_${chatId}`);
+            console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
+            var selectedChat = $(`#${groupType}_${chatId}`);
 
-            // chatSelectedTitle = selectedChat.find('.name').text();
-            // console.log('---' + chatSelectedTitle);
+            chatSelectedTitle = selectedChat. find('.name').text();
+            console.log('---' + chatSelectedTitle);
 
-            // ✅ ساخت صحیح selectedChatId
-            let selectedChatId;
-
-            if (groupType === 'Private') {
-                const currentUserId = parseInt($('#userId').val());
-                const otherUserId = parseInt(chatId);
-                const minId = Math.min(currentUserId, otherUserId);
-                const maxId = Math.max(currentUserId, otherUserId);
-                selectedChatId = `private_${minId}_${maxId}`;
-                console.log(`✅ Private chat key: ${selectedChatId}`);
-            } else {
-                selectedChatId = `${groupType}_${chatId}`;
-            }
-
-            // انتخاب عنصر با استفاده از selectedChatId صحیح
-            var selectedChat = $(`#${selectedChatId}`);
-            // فقط اگر المان و عنوان داخل آن وجود داشت، chatSelectedTitle را بروزرسانی کن
-            var foundTitle = '';
-            if (selectedChat.length) {
-                foundTitle = selectedChat.find('.name').text().trim();
-                if (foundTitle) {
-                    chatSelectedTitle = foundTitle;
-                }
-            }
-            console.log('--- chatSelectedTitle:', chatSelectedTitle);
-
-
+            let selectedChatId = `${groupType}_${chatId}`;
             window.activeGroupId = selectedChatId;
             if(selectedChat.length) {
                 const chatItemsBody = $('#chatContactTab');
@@ -694,89 +577,5 @@
         // We need to observe a parent that is always present.
         // Let's observe the body itself for the #chat-details-panel.
         observer.observe(document.body, config);
-
-
-        function restoreChatFromUrlIfNeeded() {
-            try {
-                    if (window.__chatRestoreDone) {
-                        // already restored once; skip
-                        return;
-                    }
-                    // mark as started immediately to avoid reentry
-                    window.__chatRestoreDone = true;
-
-
-                // Prefer history.state.title if present
-                const state = window.history.state || {};
-                const chatParam = state.chat || getChatParamFromUrl();
-                const stateTitle = (state.title || '').toString().trim();
-
-                if (!chatParam) return;
-
-                // parse chatParam like before
-                const parts = chatParam.split('_').map(p => (p || '').trim()).filter(Boolean);
-                if (parts.length < 2) return;
-
-                let groupType = parts[0];
-                let chatId = null;
-
-                if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
-                    const currentUserId = parseInt($('#userId').val());
-                    const id1 = parseInt(parts[1]);
-                    const id2 = parseInt(parts[2]);
-                    if (!isNaN(currentUserId) && !isNaN(id1) && !isNaN(id2)) {
-                        const otherUserId = currentUserId === id1 ? id2 : id1;
-                        chatId = otherUserId.toString();
-                    } else {
-                        chatId = parts.slice(1).join('_');
-                    }
-                    // normalize groupType to 'Private' when calling GetSelectedChatMessages
-                    groupType = 'Private';
-                } else if (parts.length === 2) {
-                    const a = parts[0], b = parts[1];
-                    if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                        groupType = a; chatId = b;
-                    } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                        groupType = b; chatId = a;
-                    } else {
-                        groupType = a; chatId = b;
-                    }
-                } else {
-                    groupType = parts[0];
-                    chatId = parts.slice(1).join('_');
-                }
-
-                // If we have title in history state, use it
-                if (stateTitle) {
-                    chatSelectedTitle = stateTitle;
-                } else {
-                    // try to find the element in the freshly-loaded chat list and read its .name
-                    // compute canonical id (like in ChatActivated)
-                    let selectedChatId;
-                    if (groupType.toLowerCase() === 'private') {
-                        const currentUserId = parseInt($('#userId').val());
-                        const otherUserId = parseInt(chatId);
-                        const minId = Math.min(currentUserId, otherUserId);
-                        const maxId = Math.max(currentUserId, otherUserId);
-                        selectedChatId = `private_${minId}_${maxId}`;
-                    } else {
-                        selectedChatId = `${groupType}_${chatId}`;
-                    }
-                    const selectedChat = $(`#${selectedChatId}`);
-                    if (selectedChat.length) {
-                        const foundTitle = selectedChat.find('.name').text().trim();
-                        if (foundTitle) chatSelectedTitle = foundTitle;
-                    }
-                }
-
-                // finally open the chat (this will load messages and set header using chatSelectedTitle)
-                safeInvokeGetSelected(chatId, groupType);
-                // ensure canonical URL (in case push was non-canonical previously)
-                pushChatToUrl(groupType, chatId);
-            } catch (e) {
-                console.error('restoreChatFromUrlIfNeeded error:', e);
-            }
-        }
-
     </script>
 }

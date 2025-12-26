@@ -70,12 +70,12 @@ namespace Messenger.WebApp.Controllers
 
             if (!result.IsValid)
             {
-                return Content("پیام شما حاوی کلمات نامناسب است " + " [" + result.FoundBadWords.First() + " ]");
+                return Content("پیام شما حاوی کلمات نامناسب است "+" [" + result.FoundBadWords.First()+" ]");
 
                 //return BadRequest(new
                 //{
-                //Error = "پیام شما حاوی کلمات نامناسب است",
-                //DetectedWords = result.FoundBadWords
+                    //Error = "پیام شما حاوی کلمات نامناسب است",
+                    //DetectedWords = result.FoundBadWords
                 //});
             }
 
@@ -222,7 +222,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="pageSize"></param>
         /// <returns></returns>
         public async Task<IActionResult> GetOldMessage(
-            int chatId,
+            string chatId,
             string groupType,
             int pageNumber = 1,
             int pageSize = 50,
@@ -337,7 +337,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="pageNumber">شماره صفحه</param>
         /// <param name="pageSize">تعداد پیام در هر صفحه</param>
         /// <returns></returns>
-        public async Task<IActionResult> GetChatMessages(int chatId, string groupType, int pageNumber = 1, int pageSize = 50)
+        public async Task<IActionResult> GetChatMessages(string chatId, string groupType, int pageNumber = 1, int pageSize = 50)
         {
             try
             {
@@ -349,19 +349,6 @@ namespace Messenger.WebApp.Controllers
 
 
                 _logger.LogInformation($"GetChatMessages: Loading initial messages for chat {chatId} (type: {groupType})");
-
-                if (groupType.Contains("private"))
-                {
-                    groupType = ConstChat.PrivateType;
-                }
-                else if (groupType.Contains("classgroup"))
-                {
-                    groupType = ConstChat.ClassGroupType;
-                }
-                else if (groupType.Contains("channelgroup"))
-                {
-                    groupType = ConstChat.ChannelGroupType;
-                }
 
                 // دریافت پیامهای اولیه بدون شناخت یک پیام هدف
                 // سرور خود تصمیم میگیرد که کدام پیامها را بفرستد
@@ -435,7 +422,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="messageId">آیدی آخرین پیام لود شده (پایین‌ترین)</param>
         /// <param name="pageSize">تعداد پیام برای دریافت</param>
         /// <returns></returns>
-        public async Task<IActionResult> GetOlderMessages(int chatId, string groupType, long messageId, int pageSize = 50)
+        public async Task<IActionResult> GetOlderMessages(string chatId, string groupType, long messageId, int pageSize = 50)
         {
             try
             {
@@ -490,7 +477,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="messageId">آیدی آخرین پیام نمایش داده شده (بالاترین)</param>
         /// <param name="pageSize">تعداد پیام برای دریافت</param>
         /// <returns></returns>
-        public async Task<IActionResult> GetNewerMessages(int chatId, string groupType, long messageId, int pageSize = 50)
+        public async Task<IActionResult> GetNewerMessages(string chatId, string groupType, long messageId, int pageSize = 50)
         {
             try
             {
@@ -545,7 +532,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="groupType">نوع چت</param>
         /// <param name="targetMessageId">آیدی پیام هدف (پیام پین شده)</param>
         /// <returns></returns>
-        public async Task<IActionResult> GetMessagesAroundTarget(int chatId, string groupType, long targetMessageId)
+        public async Task<IActionResult> GetMessagesAroundTarget(string chatId, string groupType, long targetMessageId)
         {
             try
             {
@@ -663,7 +650,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="chatId">The ID of the chat.</param>
         /// <param name="groupType">The type of the chat ('ClassGroup' or 'Channel').</param>
         /// <returns>A tuple containing the chat's name, description, and file counts.</returns>
-        private async Task<(string Name, string Description, CountSharedContentDto FileCounts)> GetChatDetailsAsync(int chatId, string groupType)
+        private async Task<(string Name, string Description, CountSharedContentDto FileCounts)> GetChatDetailsAsync(string chatId, string groupType)
         {
             string name = "نام یافت نشد";
             string description = "";
@@ -700,7 +687,7 @@ namespace Messenger.WebApp.Controllers
         /// </summary>
         /// <param name="chatId"></param>
         /// <returns></returns>
-        public async Task<IActionResult> GetChatDetails(int chatId, string groupType)
+        public async Task<IActionResult> GetChatDetails(string chatId, string groupType)
         {
             var userId = HttpContext.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
             if (userId == null)
@@ -907,9 +894,9 @@ namespace Messenger.WebApp.Controllers
         }
 
         //[HttpGet("GetGroupSharedFilesPartial")]
-        public async Task<IActionResult> GetGroupSharedFilesPartial(int chatId, string groupType, string activeTab = "media-tab")
+        public async Task<IActionResult> GetGroupSharedFilesPartial(string chatId, string groupType, string activeTab = "media-tab")
         {
-            if (chatId <= 0 || string.IsNullOrEmpty(groupType))
+            if (string.IsNullOrEmpty(chatId) || string.IsNullOrEmpty(groupType))
                 return BadRequest("Invalid chat ID or group type.");
 
             var token = Request.Cookies["AuthToken"];

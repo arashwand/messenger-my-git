@@ -604,6 +604,35 @@ namespace DatabaseMigrationTool.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Messenger.Models.Models.PrivateChatConversation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("User1Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("User2Id")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId")
+                        .IsUnique();
+
+                    b.HasIndex("User1Id");
+
+                    b.HasIndex("User2Id");
+
+                    b.ToTable("PrivateChatConversations");
+                });
+
             modelBuilder.Entity("Messenger.Models.Models.User", b =>
                 {
                     b.Property<long>("UserId")
@@ -925,6 +954,25 @@ namespace DatabaseMigrationTool.Migrations
                         .HasConstraintName("FK_PersonelChatAccess_Users");
 
                     b.Navigation("Personel");
+                });
+
+            modelBuilder.Entity("Messenger.Models.Models.PrivateChatConversation", b =>
+                {
+                    b.HasOne("Messenger.Models.Models.User", "User1")
+                        .WithMany()
+                        .HasForeignKey("User1Id")
+                        .IsRequired()
+                        .HasConstraintName("FK_PrivateChatConversations_User1");
+
+                    b.HasOne("Messenger.Models.Models.User", "User2")
+                        .WithMany()
+                        .HasForeignKey("User2Id")
+                        .IsRequired()
+                        .HasConstraintName("FK_PrivateChatConversations_User2");
+
+                    b.Navigation("User1");
+
+                    b.Navigation("User2");
                 });
 
             modelBuilder.Entity("Messenger.Models.Models.UserClassGroup", b =>

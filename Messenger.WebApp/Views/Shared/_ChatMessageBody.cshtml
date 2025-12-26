@@ -355,8 +355,8 @@
                                         </div>
                                     }
 
-                                    <h5>
-                                        @Html.Raw(message.MessageText?.MessageTxt.Replace("\n", "<br />"))
+                                    <h5 style="white-space: pre-wrap;">
+                                        @message.MessageText?.MessageTxt
                                         @if (message.IsEdited)
                                         {
                                             <small class="text-muted fst-italic">(ویرایش شده)</small>

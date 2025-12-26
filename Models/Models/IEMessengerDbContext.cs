@@ -57,7 +57,7 @@ public partial class IEMessengerDbContext : DbContext
 
     public DbSet<WebPushSubscription> PushSubscriptions { get; set; }
 
-
+    public virtual DbSet<PrivateChatConversation> PrivateChatConversations { get; set; }
 
 
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -449,6 +449,23 @@ public partial class IEMessengerDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ViewClassGroup_Users");
+        });
+
+        modelBuilder.Entity<PrivateChatConversation>(entity =>
+        {
+            entity.HasIndex(e => e.ConversationId).IsUnique();
+
+            entity.HasOne(d => d.User1)
+                .WithMany()
+                .HasForeignKey(d => d.User1Id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PrivateChatConversations_User1");
+
+            entity.HasOne(d => d.User2)
+                .WithMany()
+                .HasForeignKey(d => d.User2Id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PrivateChatConversations_User2");
         });
 
         OnModelCreatingPartial(modelBuilder);
