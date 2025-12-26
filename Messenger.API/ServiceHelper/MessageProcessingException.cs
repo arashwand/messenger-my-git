@@ -18,7 +18,7 @@ namespace Messenger.API.ServiceHelper
         {
         }
 
-        public MessageProcessingException(string message, long userId, int groupId, string groupType) 
+        public MessageProcessingException(string message, long userId, string groupId, string groupType)
             : base(message)
         {
             UserId = userId;
@@ -26,7 +26,7 @@ namespace Messenger.API.ServiceHelper
             GroupType = groupType;
         }
 
-        public MessageProcessingException(string message, Exception innerException, long userId, int groupId, string groupType)
+        public MessageProcessingException(string message, Exception innerException, long userId, string groupId, string groupType)
             : base(message, innerException)
         {
             UserId = userId;
