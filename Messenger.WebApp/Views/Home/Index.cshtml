@@ -467,35 +467,30 @@
         var chatSelectedTitle = "";
 
         function ChatActivated(chatId, groupType) {
-            console.log(`chat Id and group type is :  ${chatId} and ${groupType}`);
+            console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
             var selectedChat = $(`#${groupType}_${chatId}`);
 
-            chatSelectedTitle = selectedChat.find('.name').text();
-            console.log('---------------------------------------------------------------------------------' + chatSelectedTitle);
+            chatSelectedTitle = selectedChat. find('.name').text();
+            console.log('---' + chatSelectedTitle);
 
-            // ✅ ساخت صحیح selectedChatId برای چت خصوصی
+            // ✅ ساخت صحیح selectedChatId
             let selectedChatId;
 
             if (groupType === 'Private') {
-                // برای چت خصوصی، باید از هر دو userId استفاده کنیم
                 const currentUserId = parseInt($('#userId').val());
                 const otherUserId = parseInt(chatId);
-
-                // مرتب‌سازی برای ساخت کلید یکتا
                 const minId = Math.min(currentUserId, otherUserId);
                 const maxId = Math.max(currentUserId, otherUserId);
-
                 selectedChatId = `private_${minId}_${maxId}`;
-                console.log(`✅ Private chat ID generated: ${selectedChatId}`);
+                console.log(`✅ Private chat key: ${selectedChatId}`);
             } else {
-                // برای گروه‌ها و کانال‌ها
                 selectedChatId = `${groupType}_${chatId}`;
             }
-
+            window.activeGroupId = selectedChatId;
             if(selectedChat.length) {
                 const chatItemsBody = $('#chatContactTab');
-                const chatItems = chatItemsBody.find('. active');
-                chatItems.removeClass('active');
+                const chatItems = chatItemsBody.find('.active');
+                chatItems. removeClass('active');
                 selectedChat.addClass('active');
 
                 if (window.chatApp && window.chatApp.connection) {
@@ -506,13 +501,14 @@
                                 window.chatUIRenderer.showToast("❌ خطا در ترک چت", "error");
                             });
                     }
-                    window.chatApp.connection.invoke("JoinGroup", selectedChatId)
+                    window.chatApp. connection.invoke("JoinGroup", selectedChatId)
                         .catch(err =>{
                             console.error('Error joining group:', err);
-                            window.chatUIRenderer.showToast("❌ خطا در پیوستن به چت", "error");
+                            window.chatUIRenderer. showToast("❌ خطا در پیوستن به چت", "error");
                         });
                 }
-                window.activeGroupId = selectedChatId;
+                window.activeGroupId = selectedChatId; // ✅ مقدار صحیح ذخیره می‌شود
+                console.log(" selcted chat and window.activeGroupId:", window.activeGroupId);
             }
         }
 

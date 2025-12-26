@@ -18,16 +18,12 @@ window.chatSignalRHandlers = (function () {
 
         // دریافت پیام جدید
         connection.on("ReceiveMessage", function (message) {
-            console.log("📩 ReceiveMessage received:", {
-                messageId: message.messageId,
-                chatKey: message.chatKey,
-                groupId: message.groupId,
-                groupType: message.groupType,
-                senderUserId: message.senderUserId,
-                text: message.messageText
-            });
-
-            console.log("ChatKey in message:", message.chatKey); 
+            console.log("📩 ReceiveMessage handler triggered");
+            console.log("   Message:", message);
+            console.log("   window.activeGroupId:", window.activeGroupId);
+            console.log("   message.chatKey:", message.chatKey);
+            console.log("   message.groupId:", message.groupId);
+            console.log("   message.groupType:", message.groupType); 
             
             // ✅ دریافت چت فعلی
             const activeChatKey = window.activeGroupId; // مثلاً "private_5_10" یا "ClassGroup_123"
