@@ -514,11 +514,20 @@ namespace Messenger.WebApp.ServiceHelper
             });
 
             // رویداد دریافت تعداد پیام خوانده نشده در چت
-            _hubConnection.On<long, string, int>("UpdateUnreadCount", async (userId, key, unreadCount) =>
+            _hubConnection.On<long, object[]>("UpdateUnreadCount", async (userId, args) =>
             {
-                // Forward to the specific user in WebAppChatHub
-                await _webAppHubContext.Clients.User(userId.ToString())
-                    .SendAsync("UpdateUnreadCount", key, unreadCount);
+                try
+                {
+                    _logger.LogInformation($"UpdateUnreadCount event called: userId ={userId} and key: {args[0]} and countUnread : {args[1]}", args[0], args[1]);
+
+                    // Forward to the specific user in WebAppChatHub
+                    await _webAppHubContext.Clients.User(userId.ToString())
+                        .SendAsync("UpdateUnreadCount", args[0], args[1]);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing UpdateUnreadCount event");
+                }
             });
 
 
