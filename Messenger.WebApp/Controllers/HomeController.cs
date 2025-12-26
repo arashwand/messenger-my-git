@@ -189,7 +189,7 @@ namespace Messenger.WebApp.Controllers
         /// <param name="groupType"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        public async Task<IActionResult> GetChatPinnedMessages(int chatId, string groupType, int pageSize = 50)
+        public async Task<IActionResult> GetChatPinnedMessages(string chatId, string groupType, int pageSize = 50)
         {
             try
             {
@@ -199,9 +199,14 @@ namespace Messenger.WebApp.Controllers
                     return BadRequest("User ID not found in claims.");
                 }
 
-                var messages = await _messageService.GetChatPinnedMessagesAsync(chatId, groupType, pageSize);
+                if (!long.TryParse(chatId, out long longChatId))
+                {
+                    return BadRequest("Invalid chat ID.");
+                }
 
-                //var lastReadMessageId = await GetLastReadMessageIdPlaceholderAsync(chatId, groupType, long.Parse(userId));
+                var messages = await _messageService.GetChatPinnedMessagesAsync(longChatId, groupType, pageSize);
+
+                //var lastReadMessageId = await GetLastReadMessageIdPlaceholderAsync(longChatId, groupType, long.Parse(userId));
 
                 return PartialView("_ChatPinnedMessageBody", messages);
             }
@@ -655,11 +660,12 @@ namespace Messenger.WebApp.Controllers
             string name = "نام یافت نشد";
             string description = "";
             CountSharedContentDto fileCounts;
+            long.TryParse(chatId, out long longChatId);
 
             // Fetch name and description based on chat type
             if (groupType == ConstChat.ClassGroupType)
             {
-                var group = await _classGroupServiceClient.GetClassGroupByIdAsync(chatId);
+                var group = await _classGroupServiceClient.GetClassGroupByIdAsync(longChatId);
                 if (group != null)
                 {
                     name = group.LevelName;
@@ -668,7 +674,7 @@ namespace Messenger.WebApp.Controllers
             }
             else
             {
-                var channel = await _channelServiceClient.GetChannelByIdAsync(chatId);
+                var channel = await _channelServiceClient.GetChannelByIdAsync(longChatId);
                 if (channel != null)
                 {
                     name = channel.ChannelName;
@@ -677,7 +683,7 @@ namespace Messenger.WebApp.Controllers
             }
 
             // Fetch file counts from the dedicated service, handling potential nulls
-            fileCounts = await _fileManagementServiceClient.GetFileCountsForChatAsync(chatId, groupType);
+            fileCounts = await _fileManagementServiceClient.GetFileCountsForChatAsync(longChatId, groupType);
 
             return (name, description, fileCounts);
         }
@@ -694,11 +700,11 @@ namespace Messenger.WebApp.Controllers
             {
                 return BadRequest("User ID not found in claims.");
             }
-
+            long.TryParse(chatId, out long longChatId);
             // Fetch members in parallel with chat details for better performance
             var membersTask = groupType == ConstChat.ClassGroupType ?
-               _classGroupServiceClient.GetClassGroupMembersAsync(chatId) :
-               _channelServiceClient.GetChannelMembersAsync(chatId);
+               _classGroupServiceClient.GetClassGroupMembersAsync(longChatId) :
+               _channelServiceClient.GetChannelMembersAsync(longChatId);
 
             var chatDetailsTask = GetChatDetailsAsync(chatId, groupType);
 

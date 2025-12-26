@@ -920,7 +920,7 @@ namespace Messenger.Services.Services
                 }
 
                 // Case 4: Initial load
-                long lastReadMessageId = await _redisUnreadManage.GetLastReadMessageIdAsync(currentUserId, chatId, chatType);
+                long lastReadMessageId = await _redisUnreadManage.GetLastReadMessageIdAsync(currentUserId, targetId, chatType);
                 if (chatType == ConstChat.ChannelGroupType)
                 {
                     lastReadMessageId = 0;
