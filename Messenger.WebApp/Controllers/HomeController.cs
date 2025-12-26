@@ -326,6 +326,7 @@ namespace Messenger.WebApp.Controllers
         #region دریافت چهار حالت پیامها
 
 
+
         /// <summary>
         /// ✅ حالت 1: دریافت پیامهای اولیه بعد از انتخاب چت (اولین بار)
         /// - آخرین 50 پیام را دریافت میکند
@@ -345,6 +346,7 @@ namespace Messenger.WebApp.Controllers
                 {
                     return BadRequest("User ID not found in claims.");
                 }
+
 
                 _logger.LogInformation($"GetChatMessages: Loading initial messages for chat {chatId} (type: {groupType})");
 

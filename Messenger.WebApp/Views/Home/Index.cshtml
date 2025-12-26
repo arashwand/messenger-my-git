@@ -212,23 +212,114 @@
         }
 
         // Safe invoker that waits if window.GetSelectedChatMessages isn't defined yet
-        function safeInvokeGetSelected(chatId, groupType) {
-            if (typeof window.GetSelectedChatMessages === 'function') {
-                try { window.GetSelectedChatMessages(chatId, groupType); } catch (err) { console.error(err); }
-                return;
+               // جایگزین تابع safeInvokeGetSelected قبلی با این نسخه
+        function safeInvokeGetSelected(paramA, paramB) {
+            // helper: تشخیص اینکه رشته یک id عددی یا composite مثل "1_124644" است
+            function isNumericOrComposite(s) {
+                return /^\d+(?:_\d+)*$/.test((s || '').toString().trim());
             }
-            let tries = 0;
-            const iv = setInterval(() => {
-                if (typeof window.GetSelectedChatMessages === 'function') {
-                    clearInterval(iv);
-                    try { window.GetSelectedChatMessages(chatId, groupType); } catch (err) { console.error(err); }
+
+            try {
+                let groupType = null;
+                let chatId = null;
+
+                // حالت: فقط یک پارامتر داده شده (مثلاً token کامل "private_1_124644" یا "ClassGroup_2")
+                if (typeof paramB === 'undefined' || paramB === null) {
+                    const token = (paramA || '').toString().trim();
+                    if (!token) {
+                        console.warn('safeInvokeGetSelected: empty token');
+                        return;
+                    }
+                    const parts = token.split('_').map(p => (p || '').trim()).filter(Boolean);
+                    if (parts.length >= 2) {
+                        if (parts[0].toLowerCase() === 'private' && parts.length >= 3) {
+                            groupType = parts[0];
+                            chatId = parts.slice(1).join('_'); // '1_124644'
+                        } else {
+                            groupType = parts[0];
+                            chatId = parts.slice(1).join('_');
+                        }
+                    } else {
+                        console.warn('safeInvokeGetSelected: invalid token format', token);
+                        return;
+                    }
+                } else {
+                    // حالت: دو پارامتر داده شده (ممکن است ترتیب گروه/آی‌دی swap شده باشد)
+                    const a = (paramA || '').toString().trim();
+                    const b = (paramB || '').toString().trim();
+
+                    // اگر یکی composite عددی است (مثلاً '1_124644') و دیگری غیرعددی => composite = chatId
+                    const aIsNumComp = isNumericOrComposite(a);
+                    const bIsNumComp = isNumericOrComposite(b);
+
+                    if (!a && !b) {
+                        console.warn('safeInvokeGetSelected: both params empty');
+                        return;
+                    }
+
+                    // حالت واضح: a غیرعددی (groupType) و b عددی/کامپوزیت (chatId)
+                    if (!/^\d+$/.test(a) && (bIsNumComp || /^\d+$/.test(b))) {
+                        groupType = a;
+                        chatId = b;
+                    }
+                    // حالت معکوس: b غیرعددی و a عددی/کامپوزیت
+                    else if (!/^\d+$/.test(b) && (aIsNumComp || /^\d+$/.test(a))) {
+                        groupType = b;
+                        chatId = a;
+                    }
+                    // اگر هر دو شامل underscore و یکی از آنها با 'private' شروع می‌شود
+                    else if (a.toLowerCase().startsWith('private')) {
+                        const parts = a.split('_').map(p => (p || '').trim()).filter(Boolean);
+                        groupType = parts[0];
+                        chatId = parts.slice(1).join('_');
+                    } else if (b.toLowerCase().startsWith('private')) {
+                        const parts = b.split('_').map(p => (p || '').trim()).filter(Boolean);
+                        groupType = parts[0];
+                        chatId = parts.slice(1).join('_');
+                    } else {
+                        // fallback: اولی را گروه و دومی را آی‌دی در نظر بگیر
+                        groupType = a;
+                        chatId = b;
+                    }
+                }
+
+                // در اینجا groupType و chatId به‌صورت normalized باید مقداردهی شده باشند
+                if (!groupType || !chatId) {
+                    console.warn('safeInvokeGetSelected: failed to determine groupType/chatId', { paramA, paramB });
                     return;
                 }
-                if (++tries > 50) {
-                    clearInterval(iv);
-                    console.warn('GetSelectedChatMessages not available after waiting.');
+
+                // اگر GetSelectedChatMessages هنوز آماده نیست، مثل قبل منتظر می‌مانیم
+                if (typeof window.GetSelectedChatMessages === 'function') {
+                    try {
+                        window.GetSelectedChatMessages(chatId, groupType);
+                    } catch (err) {
+                        console.error('safeInvokeGetSelected: GetSelectedChatMessages threw', err);
+                    }
+                    return;
                 }
-            }, 50);
+
+                // fallback: polling مشابه نسخهٔ قبل، اما با پارامترهای نرمالایز شده
+                let tries = 0;
+                const iv = setInterval(() => {
+                    if (typeof window.GetSelectedChatMessages === 'function') {
+                        clearInterval(iv);
+                        try {
+                            window.GetSelectedChatMessages(chatId, groupType);
+                        } catch (err) {
+                            console.error('safeInvokeGetSelected: GetSelectedChatMessages threw after wait', err);
+                        }
+                        return;
+                    }
+                    if (++tries > 50) {
+                        clearInterval(iv);
+                        console.warn('GetSelectedChatMessages not available after waiting.');
+                    }
+                }, 50);
+
+            } catch (e) {
+                console.error('safeInvokeGetSelected error', e);
+            }
         }
 
         $(document).ready(function () {
@@ -242,18 +333,41 @@
             if (initialChat) {
                 const parts = initialChat.split('_').map(p => (p || '').trim()).filter(Boolean);
                 if (parts.length >= 2) {
-                    const a = parts[0], b = parts[1];
-                    if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                        safeInvokeGetSelected(b, a);
-                        // ensure URL has the same canonical param
-                        pushChatToUrl(a, b);
-                    } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                        safeInvokeGetSelected(a, b);
-                        pushChatToUrl(b, a);
+                    // Improved parsing:
+                    // - If private chat (private_{id1}_{id2}) keep the full id part as "id1_id2"
+                    // - Otherwise try to detect canonical order; fallback to join remaining parts
+                    let groupType = parts[0];
+                    let chatId = null;
+
+                    if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
+                        // private_1_124644  => groupType = 'private', chatId = '1_124644'
+                        chatId = parts.slice(1).join('_');
+                        console.log('--private-----------------------------chatid :', chatId);
+                    } else if (parts.length === 2) {
+                        // Normal case like ClassGroup_2
+                        const a = parts[0], b = parts[1];
+                        
+                        if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
+                            groupType = a; chatId = b;
+                        } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
+                            // swapped like 2_ClassGroup  -> normalize
+                            groupType = b; chatId = a;
+                        } else {
+                            // ambiguous, keep as-is
+                            groupType = a; chatId = b;
+                        }
+                        console.log('--ClassGroup or channel-----------------------------chatid :', b);
                     } else {
-                        safeInvokeGetSelected(a, b);
-                        pushChatToUrl(a, b);
+                        // Fallback for other multi-part ids: use first as groupType and join the rest
+                        groupType = parts[0];
+                        chatId = parts.slice(1).join('_');
+                        console.log('--multi-part ids-----------------------------chatid :', chatId);
                     }
+
+                    // invoke loading with canonical groupType/chatId
+                    safeInvokeGetSelected(chatId, groupType);
+                    // ensure URL has canonical param (e.g. private_1_124644)
+                    pushChatToUrl(groupType, chatId);
                 }
             }
 
@@ -387,15 +501,31 @@
                     // open chat described in state
                     const parts = chatParam.split('_').map(p => (p || '').trim()).filter(Boolean);
                     if (parts.length >= 2) {
-                        const a = parts[0], b = parts[1];
-                        // detect pattern (groupType_chatId or chatId_groupType)
-                        if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                            safeInvokeGetSelected(b, a);
-                        } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                            safeInvokeGetSelected(a, b);
+                        // Improved parsing (same logic as initial load):
+                        // - If private chat (private_{id1}_{id2}) keep the full id part as "id1_id2"
+                        // - Otherwise detect canonical order or fallback to join remaining parts
+                        let groupType = parts[0];
+                        let chatId = null;
+
+                        if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
+                            // private_1_124644 => groupType = 'private', chatId = '1_124644'
+                            chatId = parts.slice(1).join('_');
+                        } else if (parts.length === 2) {
+                            const a = parts[0], b = parts[1];
+                            if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
+                                groupType = a; chatId = b;
+                            } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
+                                groupType = b; chatId = a;
+                            } else {
+                                groupType = a; chatId = b;
+                            }
                         } else {
-                            safeInvokeGetSelected(a, b);
+                            // fallback for other multi-part ids
+                            groupType = parts[0];
+                            chatId = parts.slice(1).join('_');
                         }
+
+                        safeInvokeGetSelected(chatId, groupType);
                     }
                 } else {
                     // no chat in history state -> close chat panel
