@@ -417,179 +417,271 @@ window.chatUIRenderer = (function ($) {
         }
     }
 
+    /*================================متد نمایش پیام==================================*/
     /**
-     * پیام جدید را در پنجره چت نمایش می‌دهد.
-     */
+ * نمایش پیام جدید در UI
+ */
     function displayMessage(message) {
-        console.log("Displaying message received:", message);
-        console.log(`Displaying message for group ${message.groupId}. Active group is ${$('#current-group-id-hidden-input').val()}`);
+        logMessageReceived(message);
 
         const activeGroupId = parseInt($('#current-group-id-hidden-input').val());
         const currentUserId = currentUser || parseInt($('#userId').val());
-        let isSelf = (currentUserId === message.senderUserId);
+        const isSelf = determineIfMessageIsSelf(message, currentUserId);
 
+        // ۱. همیشه پیش‌نمایش سایدبار را آپدیت کن
+        updateSidebarPreview(message);
+
+        // ۲. تشخیص اینکه آیا پیام باید در چت فعال نمایش داده شود
+        const shouldDisplay = shouldDisplayInActiveChat(message, activeGroupId);
+
+        if (shouldDisplay) {
+            displayMessageInActiveChat(message, isSelf, currentUserId);
+        } else if (!isSelf) {
+            updateUnreadBadgeForInactiveChat(message);
+        }
+    }
+
+    // =================================================
+    //         HELPER FUNCTIONS FOR displayMessage
+    // =================================================
+
+    /**
+     * لاگ اطلاعات دریافت پیام
+     */
+    function logMessageReceived(message) {
+        console.log("📩 Displaying message received:", message);
+        console.log(`   message.groupId: ${message.groupId}`);
+        console.log(`   message.groupType: ${message.groupType}`);
+        console.log(`   message.chatKey: ${message.chatKey}`);
+        console.log(`   window.activeGroupId: ${window.activeGroupId}`);
+        console.log(`   #current-group-id-hidden-input: ${$('#current-group-id-hidden-input').val()}`);
+    }
+
+    /**
+     * تشخیص اینکه آیا پیام از طرف خود کاربر است
+     */
+    function determineIfMessageIsSelf(message, currentUserId) {
         if (message.isSystemMessage) {
             message.senderUserName = "systembot";
-            isSelf = false;
+            return false;
         }
+        return currentUserId === message.senderUserId;
+    }
 
-        console.log('activeGroup :' + activeGroupId + ' currentUserId: ' + currentUserId + ' isSelf: ' + isSelf);
-
-        // ۱. به‌روزرسانی پیش‌نمایش آخرین پیام در سایدبار
+    /**
+     * به‌روزرسانی پیش‌نمایش آخرین پیام در سایدبار
+     */
+    function updateSidebarPreview(message) {
         const chatTextElement = document.getElementById(`chatText_${message.groupType}_${message.groupId}`);
         const chatTimeElement = document.getElementById(`chatTime_${message.groupType}_${message.groupId}`);
 
         if (chatTextElement && chatTimeElement) {
             const previewText = createMessagePreviewText(message);
             chatTextElement.innerHTML = `<span>${message.senderUserName}:</span> ${previewText}`;
-            chatTimeElement.innerText = convertDateTohhmm(message.messageDateTime); // اینجا استفاده شده
+            chatTimeElement.innerText = convertDateTohhmm(message.messageDateTime);
+
             const listItem = document.getElementById(`chatListItem_${message.groupId}`);
             if (listItem) {
                 listItem.parentElement.prepend(listItem);
             }
         }
+    }
 
-        // ۲. بررسی اینکه پیام متعلق به گروه فعال است یا نه
-        if (message.groupId === activeGroupId) {
-            console.log('message.groupId === activeGroupId');
-            const chat_content = $('#chat_content');
-
-            const messageDate = new Date(message.messageDate);
-            const dateStr = formatDate(messageDate); // اینجا استفاده شده
-            let messageList = $(`#chatMessages-${dateStr}`);
-
-            if (!messageList.length) {
-                const today = new Date();
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-
-                const todayStr = formatDate(today); // اینجا استفاده شده
-                const yesterdayStr = formatDate(yesterday); // اینجا استفاده شده
-
-                let dateLabel = '';
-
-                switch (dateStr) {
-                    case todayStr:
-                        dateLabel = "امروز";
-                        break;
-                    case yesterdayStr:
-                        dateLabel = "دیروز";
-                        break;
-                    default:
-                        dateLabel = messageDate.toLocaleDateString('fa-IR', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        });
-                        break;
-                }
-
-                const headerId = `date-${dateStr}`;
-                const newDayHtml = `
-                <h6 class="fw-normal text-center heading chatInDateLabelClass" data-label="${dateLabel}" id="${headerId}">${dateLabel}</h6>
-                <ul class="message-box-list" id="chatMessages-${dateStr}"></ul>`;
-
-                $('#Message_Days').append(newDayHtml);
-                messageList = $(`#chatMessages-${dateStr}`);
-            }
-
-            if (!chat_content.length || !messageList.length) {
-                console.error("Chat container elements not found.");
-                return;
-            }
-
-            const scrollHeightBefore = chat_content.prop("scrollHeight");
-            const scrollTopBefore = chat_content.scrollTop();
-            const clientHeight = chat_content.innerHeight();
-            const wasAtBottom = (scrollHeightBefore - (scrollTopBefore + clientHeight)) <= 30;
-
-            const msgHtml = createMessageHtmlBody(message);
-            const $msgElement = $(msgHtml);
-            messageList.append($msgElement);
-
-            if (typeof init_iconsax === 'function') {
-                init_iconsax();
-            }
-
-            // مدیریت فایل صوتی
-            const hasAudioFile = message.messageFiles && message.messageFiles.some(file =>
-                file.fileName.toLowerCase().endsWith('.webm') ||
-                (file.fileType && file.fileType.startsWith('audio'))
-            );
-
-            if (hasAudioFile) {
-                const $audio = $msgElement.find('.audio-player-container audio');
-                if ($audio.length) {
-                    const audioElement = $audio.get(0);
-                    const $container = $audio.closest('.audio-player-container');
-                    const $durationDisplay = $container.find('.voice-duration-display');
-
-                    const setDurationText = (duration) => {
-                        if (duration && isFinite(duration)) {
-                            $durationDisplay.text(formatAudioTime(duration)); // اینجا استفاده شده
-                        } else {
-                            $durationDisplay.text('?:??');
-                        }
-                    };
-
-                    if (audioElement.duration && isFinite(audioElement.duration)) {
-                        setDurationText(audioElement.duration);
-                    } else {
-                        const audioSrc = audioElement.src;
-                        if (audioSrc && audioSrc.startsWith('blob:')) {
-                            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                            fetch(audioSrc)
-                                .then(response => response.arrayBuffer())
-                                .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
-                                .then(audioBuffer => {
-                                    setDurationText(audioBuffer.duration);
-                                })
-                                .catch(err => {
-                                    console.error('Web Audio API failed to decode audio:', err);
-                                    setDurationText(null);
-                                });
-                        } else {
-                            $audio.one('loadedmetadata', function () {
-                                setDurationText(this.duration);
-                            });
-                        }
-                    }
-                } else {
-                    console.warn('Message was marked as audio, but .audio-player-container was not found in the DOM.');
-                }
-            }
-
-            // مدیریت اسکرول خودکار یا نمایش اعلان "پیام جدید"
-            if (isSelf || wasAtBottom) {
-                requestAnimationFrame(() => {
-                    const chatFinished = $('#chat-finished');
-                    chatFinished[0]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    $('#newMessagesNotice').hide().data('newCount', 0).text('');
-                });
+    /**
+     * تشخیص اینکه آیا پیام باید در چت فعال نمایش داده شود
+     */
+    function shouldDisplayInActiveChat(message, activeGroupId) {
+        if (message.groupType === 'Private') {
+            // برای چت خصوصی:  مقایسه chatKey
+            if (window.activeGroupId && message.chatKey) {
+                const shouldDisplay = (window.activeGroupId === message.chatKey);
+                console.log(`✅ Private chat check: ${window.activeGroupId} === ${message.chatKey} → ${shouldDisplay}`);
+                return shouldDisplay;
             } else {
-                const newNotice = $('#newMessagesNotice');
-                let count = newNotice.data('newCount') || 0;
-                count++;
-                newNotice.data('newCount', count).text(`مشاهده ${count} پیام جدید`).show();
+                // Fallback:  مقایسه groupId
+                const shouldDisplay = (message.groupId === activeGroupId);
+                console.log(`⚠️ Fallback Private chat check: ${message.groupId} === ${activeGroupId} → ${shouldDisplay}`);
+                return shouldDisplay;
             }
-
-            // بررسی وضعیت خوانده شدن پیام جدید
-            if (!isSelf) {
-                const newMessageElement = $(`#message-${message.messageId}, #message-msg-temp-${message.clientMessageId}`).first();
-                if (newMessageElement.length) {
-                    setTimeout(() => {
-                        if (window.chatMessageManager && window.chatMessageManager.checkVisibleMessages) {
-                            window.chatMessageManager.checkVisibleMessages(newMessageElement);
-                        }
-                    }, 250);
-                }
-            }
-
-        } else if (!isSelf) {
-            console.log('message.groupId !== activeGroupId')
+        } else {
+            // برای گروه‌ها و کانال‌ها
+            const shouldDisplay = (message.groupId === activeGroupId);
+            console.log(`Group/Channel check: ${message.groupId} === ${activeGroupId} → ${shouldDisplay}`);
+            return shouldDisplay;
         }
     }
+
+    /**
+     * نمایش پیام در چت فعال
+     */
+    function displayMessageInActiveChat(message, isSelf, currentUserId) {
+        console.log('✅ Displaying message in active chat');
+
+        const chat_content = $('#chat_content');
+        if (!chat_content.length) {
+            console.error("Chat content container not found.");
+            return;
+        }
+
+        // پیدا کردن یا ایجاد کانتینر تاریخ
+        const messageDate = new Date(message.messageDate);
+        const dateStr = formatDate(messageDate);
+        let messageList = findOrCreateDateContainer(dateStr, messageDate);
+
+        if (!messageList || !messageList.length) {
+            console.error("Could not find or create message list container.");
+            return;
+        }
+
+        // ذخیره وضعیت اسکرول قبل از اضافه کردن پیام
+        const scrollState = captureScrollState(chat_content);
+
+        // اضافه کردن پیام به DOM
+        const msgHtml = createMessageHtmlBody(message);
+        const $msgElement = $(msgHtml);
+        messageList.append($msgElement);
+
+        // راه‌اندازی مجدد آیکون‌ها
+        if (typeof init_iconsax === 'function') {
+            init_iconsax();
+        }
+
+        // مدیریت اسکرول
+        handleScrollAfterMessage(chat_content, scrollState, isSelf);
+
+        // بررسی وضعیت خوانده شدن
+        if (!isSelf) {
+            scheduleVisibilityCheck($msgElement);
+        }
+    }
+
+    /**
+     * پیدا کردن یا ایجاد کانتینر برای تاریخ مشخص
+     */
+    function findOrCreateDateContainer(dateStr, messageDate) {
+        let messageList = $(`#chatMessages-${dateStr}`);
+
+        if (!messageList.length) {
+            const dateLabel = generateDateLabel(messageDate, dateStr);
+            const headerId = `date-${dateStr}`;
+            const newDayHtml = `
+            <h6 class="fw-normal text-center heading chatInDateLabelClass" data-label="${dateLabel}" id="${headerId}">${dateLabel}</h6>
+            <ul class="message-box-list" id="chatMessages-${dateStr}"></ul>`;
+
+            $('#Message_Days').append(newDayHtml);
+            messageList = $(`#chatMessages-${dateStr}`);
+        }
+
+        return messageList;
+    }
+
+    /**
+     * تولید برچسب تاریخ (امروز، دیروز، یا تاریخ کامل)
+     */
+    function generateDateLabel(messageDate, dateStr) {
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const todayStr = formatDate(today);
+        const yesterdayStr = formatDate(yesterday);
+
+        if (dateStr === todayStr) {
+            return "امروز";
+        } else if (dateStr === yesterdayStr) {
+            return "دیروز";
+        } else {
+            return messageDate.toLocaleDateString('fa-IR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+    }
+
+    /**
+     * ذخیره وضعیت اسکرول فعلی
+     */
+    function captureScrollState(chat_content) {
+        const scrollHeight = chat_content.prop("scrollHeight");
+        const scrollTop = chat_content.scrollTop();
+        const clientHeight = chat_content.innerHeight();
+        const wasAtBottom = (scrollHeight - (scrollTop + clientHeight)) <= 30;
+
+        return {
+            scrollHeight,
+            scrollTop,
+            clientHeight,
+            wasAtBottom
+        };
+    }
+
+    /**
+     * مدیریت اسکرول بعد از اضافه کردن پیام
+     */
+    function handleScrollAfterMessage(chat_content, scrollState, isSelf) {
+        if (isSelf || scrollState.wasAtBottom) {
+            // اسکرول به پایین برای پیام‌های خودی یا زمانی که کاربر در انتها بود
+            requestAnimationFrame(() => {
+                const chatFinished = $('#chat-finished');
+                chatFinished[0]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                $('#newMessagesNotice').hide().data('newCount', 0).text('');
+            });
+        } else {
+            // نمایش اعلان "پیام جدید"
+            const newNotice = $('#newMessagesNotice');
+            let count = newNotice.data('newCount') || 0;
+            count++;
+            newNotice.data('newCount', count).text(`مشاهده ${count} پیام جدید`).show();
+        }
+    }
+
+    /**
+     * برنامه‌ریزی بررسی دیده شدن پیام
+     */
+    function scheduleVisibilityCheck($msgElement) {
+        setTimeout(() => {
+            if (window.chatMessageManager && window.chatMessageManager.checkVisibleMessages) {
+                window.chatMessageManager.checkVisibleMessages($msgElement);
+            }
+        }, 250);
+    }
+
+    /**
+     * به‌روزرسانی badge برای چت غیرفعال
+     */
+    function updateUnreadBadgeForInactiveChat(message) {
+        console.log('❌ Message NOT in active chat - updating unread badge');
+
+        const badgeKey = generateBadgeKey(message);
+        console.log(`   Looking for badge with key: ${badgeKey}`);
+
+        const unreadBadge = $(`#unreadCountBadge_${badgeKey}`);
+
+        if (unreadBadge.length) {
+            let currentCount = parseInt(unreadBadge.text()) || 0;
+            currentCount++;
+            unreadBadge.text(currentCount).removeClass('d-none');
+            console.log(`✅ Updated badge for ${badgeKey}: ${currentCount}`);
+        } else {
+            console.warn(`⚠️ Badge not found for key: ${badgeKey}`);
+            console.warn(`   Tried selector: #unreadCountBadge_${badgeKey}`);
+        }
+    }
+
+    /**
+     * تولید کلید badge بر اساس نوع پیام
+     */
+    function generateBadgeKey(message) {
+        if (message.groupType === 'Private' && message.chatKey) {
+            return message.chatKey; // مثلاً "private_5_124644"
+        } else {
+            return `${message.groupType}_${message.groupId}`; // مثلاً "ClassGroup_10"
+        }
+    }
+
+    /*================================پایان متد نمایش پیام============================*/
 
     /**
      * یک متن خلاصه‌ و مناسب برای نمایش در پیش‌نمایش لیست چت‌ها ایجاد می‌کند.
