@@ -446,11 +446,11 @@ window.chatUIRenderer = (function ($) {
     // =================================================
 
     /**
-    * تولید کلید badge بر اساس نوع چت
-    * این تابع در چندین جا استفاده می‌شود
+    * تولید کلید badge بر اساس groupId و groupType
     */
     function generateBadgeKeyForGroup(groupId, groupType) {
         if (groupType === 'Private') {
+            // برای چت خصوصی:  باید chatKey کامل را بسازیم
             const currentUserId = parseInt($('#userId').val());
 
             if (!currentUserId) {
@@ -458,6 +458,7 @@ window.chatUIRenderer = (function ($) {
                 return `Private_${groupId}`; // Fallback
             }
 
+            // receiverUserId = groupId
             const receiverUserId = groupId;
             const minId = Math.min(currentUserId, receiverUserId);
             const maxId = Math.max(currentUserId, receiverUserId);
@@ -505,11 +506,21 @@ window.chatUIRenderer = (function ($) {
     }
 
     /**
-     * به‌روزرسانی پیش‌نمایش آخرین پیام در سایدبار
-     */
+    * به‌روزرسانی پیش‌نمایش آخرین پیام در سایدبار
+    */
     function updateSidebarPreview(message) {
-        const chatTextElement = document.getElementById(`chatText_${message.groupType}_${message.groupId}`);
-        const chatTimeElement = document.getElementById(`chatTime_${message.groupType}_${message.groupId}`);
+        // ✅ ساخت صحیح ID برای sidebar
+        let sidebarKey;
+        if (message.groupType === 'Private' && message.chatKey) {
+            sidebarKey = message.chatKey; // مثلاً "private_5_124644"
+        } else {
+            sidebarKey = `${message.groupType}_${message.groupId}`; // مثلاً "ClassGroup_10"
+        }
+
+        console.log(`🔄 Updating sidebar for key: ${sidebarKey}`);
+
+        const chatTextElement = document.getElementById(`chatText_${sidebarKey}`);
+        const chatTimeElement = document.getElementById(`chatTime_${sidebarKey}`);
 
         if (chatTextElement && chatTimeElement) {
             const previewText = createMessagePreviewText(message);
@@ -520,6 +531,10 @@ window.chatUIRenderer = (function ($) {
             if (listItem) {
                 listItem.parentElement.prepend(listItem);
             }
+            console.log(`✅ Sidebar updated successfully`);
+        } else {
+            console.warn(`⚠️ Sidebar elements not found for key: ${sidebarKey}`);
+            console.warn(`   Tried:  #chatText_${sidebarKey}, #chatTime_${sidebarKey}`);
         }
     }
 
@@ -1222,39 +1237,48 @@ window.chatUIRenderer = (function ($) {
      * بروزرسانی تعداد پیام خوانده نشده
      */
     function updateUnreadCountForGroup(key, count) {
+        console.log(`🔔 updateUnreadCountForGroup Called! key: ${key}, count:  ${count}, type: ${typeof count}`);
+
         const unreadBadge = $(`#unreadCountBadge_${key}`);
-        console.log(`updateUnreadCountForGroup Called! key: ${key}, count: ${count}, type: ${typeof count}`);
 
         if (!unreadBadge.length) {
-            console.log('unread container not found!');
+            console.warn(`⚠️ Badge NOT FOUND for key: ${key}`);
+            console.warn(`   Selector tried: #unreadCountBadge_${key}`);
+
+            // برای دیباگ:  لیست تمام badge های موجود
+            const allBadges = $('[id^="unreadCountBadge_"]');
+            console.log(`   Available badges (${allBadges.length}):`);
+            allBadges.each(function () {
+                console.log(`     - ${this.id}`);
+            });
             return;
+        }
+
+        console.log(`   Current badge:  text="${unreadBadge.text()}", hidden=${unreadBadge.hasClass('d-none')}`);
+
+        if (count === 0) {
+            unreadBadge.text(0).addClass('d-none');
+            console.log(`   ✅ Badge hidden (count=0)`);
         } else {
-            console.log(`Current badge text: ${unreadBadge.text()}, has d-none: ${unreadBadge.hasClass('d-none')}`);
-            if (count === 0) {
-                console.log('Entering count === 0 block');
-                unreadBadge.text(count).addClass('d-none');
-            } else {
-                console.log(`Entering else block with count: ${count}`);
-                unreadBadge.text(count).removeClass('d-none');
-            }
-            console.log(`After update - badge text: ${unreadBadge.text()}, has d-none: ${unreadBadge.hasClass('d-none')}`);
+            unreadBadge.text(count).removeClass('d-none');
+            console.log(`   ✅ Badge updated to ${count}`);
         }
     }
 
     /**
- * وقتی پیام توسط یک فرد خوانده شد
- */
+    * وقتی پیام توسط یک فرد خوانده شد
+    */
     function handleMessageSuccessfullyMarkedAsRead(messageId, groupId, groupType, unreadCount) {
-        console.log(`MessageSuccessfullyMarkedAsRead called:  messageId=${messageId}, groupId=${groupId}, groupType=${groupType}, unreadCount=${unreadCount}, time=${new Date().toISOString()}`);
+        console.log(`MessageSuccessfullyMarkedAsRead called:   messageId=${messageId}, groupId=${groupId}, groupType=${groupType}, unreadCount=${unreadCount}, time=${new Date().toISOString()}`);
 
         const messageElement = $('#message-' + messageId);
         if (messageElement.length) {
             messageElement.attr('data-is-read', 'true');
         }
 
-        // ✅ ساخت کلید صحیح برای badge
+        // ✅ استفاده از generateBadgeKeyForGroup
         const key = generateBadgeKeyForGroup(groupId, groupType);
-        console.log(`✅ Generated badge key: ${key}`);
+        console.log(`✅ Generated badge key: ${key} for unreadCount: ${unreadCount}`);
         updateUnreadCountForGroup(key, unreadCount);
     }
 
@@ -1262,7 +1286,7 @@ window.chatUIRenderer = (function ($) {
     * وقتی کاربر بر روی مشاهده همه کلیک کرد
     */
     function handleAllUnreadMessageSuccessfullyMarkedAsRead(messageIds, groupId, groupType, unreadCount) {
-        console.log(`handleAllUnreadMessageSuccessfullyMarkedAsRead called: messageIds = ${messageIds}, groupId = ${groupId}, groupType = ${groupType}, unreadCount = ${unreadCount}, time = ${new Date().toISOString()}`);
+        console.log(`handleAllUnreadMessageSuccessfullyMarkedAsRead called:  messageIds = ${messageIds}, groupId = ${groupId}, groupType = ${groupType}, unreadCount = ${unreadCount}, time = ${new Date().toISOString()}`);
 
         $('#chat_content .message[data-is-read="false"]').each(function () {
             $(this).attr('data-is-read', 'true');
@@ -1272,9 +1296,9 @@ window.chatUIRenderer = (function ($) {
             $(`#message-${messageId}`).attr('data-is-read', 'true');
         });
 
-        // ✅ ساخت کلید صحیح برای badge
+        // ✅ استفاده از generateBadgeKeyForGroup
         const key = generateBadgeKeyForGroup(groupId, groupType);
-        console.log(`✅ Generated badge key: ${key}`);
+        console.log(`✅ Generated badge key: ${key} for unreadCount: ${unreadCount}`);
         updateUnreadCountForGroup(key, unreadCount);
 
         if (window.chatMessageManager && window.chatMessageManager.setIsMarkingAllMessagesAsRead) {

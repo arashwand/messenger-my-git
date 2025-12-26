@@ -375,14 +375,30 @@ namespace Messenger.API.Hubs
 
         private async Task SendUnreadCountUpdateAsync(long userId, long targetId, string groupType, int unreadCount, bool isBridge)
         {
+            string badgeKey;
+
+            if (groupType == ConstChat.PrivateType)
+            {
+                // برای چت خصوصی:   ساخت private_{minId}_{maxId}
+                var minId = Math.Min(userId, targetId);
+                var maxId = Math.Max(userId, targetId);
+                badgeKey = $"private_{minId}_{maxId}";
+            }
+            else
+            {
+                // برای گروه و کانال
+                badgeKey = GenerateSignalRGroupKey.GenerateKey(targetId, groupType);
+            }
+
+            _logger.LogInformation($"Sending UpdateUnreadCount:  userId={userId}, badgeKey={badgeKey}, count={unreadCount}");
+
             await this.NotifyUserAndBridgeAsync(_logger,
                 BridgeGroupName,
                 userId,
                 "UpdateUnreadCount",
                 new object[] {
-                    userId,
-                    GenerateSignalRGroupKey.GenerateKey(targetId, groupType),
-                    unreadCount
+            badgeKey,  // ✅ کلید صحیح
+            unreadCount
                 },
                 isBridgeSender: isBridge
             );
@@ -797,10 +813,14 @@ namespace Messenger.API.Hubs
                     await _redisUnreadManage.DecrementUnreadCountAsync(currentUserId, groupId, groupType);
                     var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(currentUserId, groupId, groupType);
 
+                    // ✅ ارسال MessageSuccessfullyMarkedAsRead
                     if (IsBridge())
                         await Clients.Caller.SendAsync("MessageSuccessfullyMarkedAsRead", messageId, groupId, groupType, unreadCount);
                     else
                         await Clients.Client(Context.ConnectionId).SendAsync("MessageSuccessfullyMarkedAsRead", messageId, groupId, groupType, unreadCount);
+
+                    // ✅ ارسال UpdateUnreadCount برای آپدیت badge
+                    await SendUnreadCountUpdateAsync(currentUserId, groupId, groupType, unreadCount, IsBridge());
                 }
             }
             catch (Exception ex)

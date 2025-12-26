@@ -14,11 +14,16 @@ namespace Messenger.Tools
         /// <param name="id">ایدی کانال یا گروه چت</param>
         /// <param name="groupType">نوع : کانال یا گروه که با توجه به کلاس ثابت   ConstChat  فراخوانی میشه</param>
         /// <returns></returns>
-        public static string GenerateKey(long id,string groupType)
+        public static string GenerateKey(long id, string groupType)
         {
-            return groupType == ConstChat.ClassGroupType
-                ? ConstChat.ClassGroup + id
-                : ConstChat.ChannelGroup + id;
+            if (groupType == ConstChat.ClassGroupType)
+                return ConstChat.ClassGroup + id;
+            else if (groupType == ConstChat.ChannelGroupType)
+                return ConstChat.ChannelGroup + id;
+            else if (groupType == ConstChat.PrivateType)
+                return $"Private_{id}";  // ⚠️ این هنوز اشتباه است!
+            else
+                return $"{groupType}_{id}";
         }
     }
 }
