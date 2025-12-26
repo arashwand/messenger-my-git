@@ -89,12 +89,21 @@ namespace Messenger.API.ServiceHelper
                 _logger.LogInformation("Message saved with MessageId: {MessageId}", savedMessageDto.MessageId);
 
                 // 2. ارسال پیام از طریق SignalR
-                if (!long.TryParse(queuedMessage.GroupId, out var numericGroupId))
+                string groupKey;
+                if (queuedMessage.GroupType == ConstChat.PrivateType)
                 {
-                    _logger.LogError("Invalid GroupId format in queued message: {GroupId}", queuedMessage.GroupId);
-                    return; // Or throw an exception
+                    long receiverId = savedMessageDto.GroupId;
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(queuedMessage.UserId, receiverId);
                 }
-                var groupKey = GenerateSignalRGroupKey.GenerateKey(numericGroupId, queuedMessage.GroupType);
+                else
+                {
+                    if (!long.TryParse(queuedMessage.GroupId, out var numericGroupId))
+                    {
+                        _logger.LogError("Invalid GroupId format in queued message: {GroupId}", queuedMessage.GroupId);
+                        return;
+                    }
+                    groupKey = GenerateSignalRGroupKey.GenerateKey(numericGroupId, queuedMessage.GroupType);
+                }
 
                 await _hubContext.Clients.Group(groupKey).SendAsync("ReceiveMessage", savedMessageDto);
                 _logger.LogInformation("Message broadcasted to SignalR group {GroupKey}", groupKey);
