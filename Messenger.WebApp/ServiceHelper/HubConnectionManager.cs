@@ -516,10 +516,11 @@ namespace Messenger.WebApp.ServiceHelper
             // رویداد دریافت تعداد پیام خوانده نشده در چت
             _hubConnection.On<long, string, int>("UpdateUnreadCount", async (userId, key, unreadCount) =>
             {
-                // Forward to the specific user
+                // Forward to the specific user in WebAppChatHub
                 await _webAppHubContext.Clients.User(userId.ToString())
                     .SendAsync("UpdateUnreadCount", key, unreadCount);
             });
+
 
             // این رویداد فقط برای تایید ارسال موفق پیام به خود فرستنده است
             _hubConnection.On<MessageDto>("MessageSentSuccessfully", async (savedMessage) =>

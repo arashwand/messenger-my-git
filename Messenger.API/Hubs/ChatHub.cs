@@ -379,29 +379,33 @@ namespace Messenger.API.Hubs
 
             if (groupType == ConstChat.PrivateType)
             {
-                // برای چت خصوصی:   ساخت private_{minId}_{maxId}
+                // برای چت خصوصی:  ساخت private_{minId}_{maxId}
                 var minId = Math.Min(userId, targetId);
                 var maxId = Math.Max(userId, targetId);
                 badgeKey = $"private_{minId}_{maxId}";
+                _logger.LogInformation($"✅ Generated Private badge key: {badgeKey} for userId={userId}, targetId={targetId}");
             }
             else
             {
                 // برای گروه و کانال
                 badgeKey = GenerateSignalRGroupKey.GenerateKey(targetId, groupType);
+                _logger.LogInformation($"✅ Generated Group/Channel badge key: {badgeKey}");
             }
 
-            _logger.LogInformation($"Sending UpdateUnreadCount:  userId={userId}, badgeKey={badgeKey}, count={unreadCount}");
+            _logger.LogInformation($"📤 Sending UpdateUnreadCount:  badgeKey={badgeKey}, unreadCount={unreadCount}, isBridge={isBridge}");
 
             await this.NotifyUserAndBridgeAsync(_logger,
                 BridgeGroupName,
                 userId,
                 "UpdateUnreadCount",
                 new object[] {
-            badgeKey,  // ✅ کلید صحیح
-            unreadCount
+            badgeKey,  // پارامتر اول: key
+            unreadCount  // پارامتر دوم: count
                 },
                 isBridgeSender: isBridge
             );
+
+            _logger.LogInformation($"✅ UpdateUnreadCount sent successfully");
         }
 
         // =================== Helpers / Queries ===================
@@ -796,6 +800,8 @@ namespace Messenger.API.Hubs
             if (currentUserId <= 0 || messageId <= 0) return;
             if (!IsBridge()) currentUserId = GetCurrentUserId();
 
+            _logger.LogInformation($"MarkMessageAsRead called:  userId={currentUserId}, groupId={groupId}, groupType={groupType}, messageId={messageId}");
+
             try
             {
                 var senderUserId = await _messageService.MarkMessageAsReadAsync(messageId, currentUserId, groupId, groupType);
@@ -813,6 +819,8 @@ namespace Messenger.API.Hubs
                     await _redisUnreadManage.DecrementUnreadCountAsync(currentUserId, groupId, groupType);
                     var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(currentUserId, groupId, groupType);
 
+                    _logger.LogInformation($"After mark as read: unreadCount={unreadCount}");
+
                     // ✅ ارسال MessageSuccessfullyMarkedAsRead
                     if (IsBridge())
                         await Clients.Caller.SendAsync("MessageSuccessfullyMarkedAsRead", messageId, groupId, groupType, unreadCount);
@@ -820,6 +828,7 @@ namespace Messenger.API.Hubs
                         await Clients.Client(Context.ConnectionId).SendAsync("MessageSuccessfullyMarkedAsRead", messageId, groupId, groupType, unreadCount);
 
                     // ✅ ارسال UpdateUnreadCount برای آپدیت badge
+                    _logger.LogInformation($"🔔 Calling SendUnreadCountUpdateAsync for userId={currentUserId}, groupId={groupId}, groupType={groupType}, unreadCount={unreadCount}");
                     await SendUnreadCountUpdateAsync(currentUserId, groupId, groupType, unreadCount, IsBridge());
                 }
             }

@@ -108,6 +108,7 @@ namespace Messenger.API.Hubs
                 logger.LogInformation("NotifyUserAndBridgeAsync: method={Method}, userId={UserId}, isBridge={IsBridge}", 
                     method, userId, isBridgeSender);
 
+
                 // ارسال به کاربر
                 logger.LogInformation("Sending to User({UserId})", userId);
                 await hub.Clients.User(userId.ToString()).SendAsync(method, args);

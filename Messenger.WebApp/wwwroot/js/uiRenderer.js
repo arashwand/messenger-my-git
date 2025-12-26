@@ -1234,27 +1234,32 @@ window.chatUIRenderer = (function ($) {
     }
 
     /**
-     * بروزرسانی تعداد پیام خوانده نشده
-     */
+    * بروزرسانی تعداد پیام خوانده نشده
+    */
     function updateUnreadCountForGroup(key, count) {
-        console.log(`🔔 updateUnreadCountForGroup Called! key: ${key}, count:  ${count}, type: ${typeof count}`);
+        console.log(`🔔 updateUnreadCountForGroup Called! `);
+        console.log(`   key: ${key}`);
+        console.log(`   count: ${count}`);
+        console.log(`   type: ${typeof count}`);
+        console.log(`   Selector: #unreadCountBadge_${key}`);
 
         const unreadBadge = $(`#unreadCountBadge_${key}`);
 
         if (!unreadBadge.length) {
-            console.warn(`⚠️ Badge NOT FOUND for key: ${key}`);
-            console.warn(`   Selector tried: #unreadCountBadge_${key}`);
+            console.error(`❌ Badge NOT FOUND for key: ${key}`);
+            console.warn(`   Tried selector: #unreadCountBadge_${key}`);
 
-            // برای دیباگ:  لیست تمام badge های موجود
+            // برای دیباگ:  نمایش تمام badge های موجود
             const allBadges = $('[id^="unreadCountBadge_"]');
-            console.log(`   Available badges (${allBadges.length}):`);
+            console.log(`   📋 Available badges (${allBadges.length}):`);
             allBadges.each(function () {
-                console.log(`     - ${this.id}`);
+                console.log(`      - ${this.id}`);
             });
             return;
         }
 
-        console.log(`   Current badge:  text="${unreadBadge.text()}", hidden=${unreadBadge.hasClass('d-none')}`);
+        console.log(`   ✅ Badge found! `);
+        console.log(`   Current:  text="${unreadBadge.text()}", hidden=${unreadBadge.hasClass('d-none')}`);
 
         if (count === 0) {
             unreadBadge.text(0).addClass('d-none');
@@ -1263,6 +1268,8 @@ window.chatUIRenderer = (function ($) {
             unreadBadge.text(count).removeClass('d-none');
             console.log(`   ✅ Badge updated to ${count}`);
         }
+
+        console.log(`   Final: text="${unreadBadge.text()}", hidden=${unreadBadge.hasClass('d-none')}`);
     }
 
     /**
@@ -1416,6 +1423,7 @@ window.chatUIRenderer = (function ($) {
         scrollToMessage: scrollToMessage,
         waitForElementAndScroll: waitForElementAndScroll,
         showToast: showToast,
+
         // هندلرهای SignalR
         handleUserTyping: handleUserTyping,
         handleUserStopTyping: handleUserStopTyping,
