@@ -186,7 +186,7 @@ namespace Messenger.Services.Services
                 if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
                 {
                     var hasReceiveAnyMessageFromAdminOrPersonel = await _context.Messages.AnyAsync(m => m.OwnerId == user.UserId && 
-                        m.SenderUserId == chatId);
+                        m.SenderUserId == numericChatId);
                     if (!hasReceiveAnyMessageFromAdminOrPersonel)
                     {
                         throw new Exception("User is not a member of this class group");
@@ -214,7 +214,7 @@ namespace Messenger.Services.Services
                 // ایجاد پیام
                 var messageEntity = new Message
                 {
-                    OwnerId = chatId,
+                    OwnerId = numericChatId,
                     SenderUserId = senderUserId,
                     MessageDateTime = DateTime.UtcNow,
                     MessageType = chatTypeDetected,
@@ -281,11 +281,11 @@ namespace Messenger.Services.Services
                     MessageDateTime = messageEntity.MessageDateTime,
                     MessageType = messageEntity.MessageType,
                     ReplyMessageId = replyToMessageId,
-                    OwnerId = chatId,
+                    OwnerId = numericChatId,
                     IsSystemMessage = isPortalMessage,
                     
                     // ✅ اضافه کردن ReceiverUserId برای Private messages
-                    ReceiverUserId = (chatType == ConstChat.PrivateType) ? chatId : null,
+                    ReceiverUserId = (chatType == ConstChat.PrivateType) ? numericChatId : null,
                     
                     MessageText = messageTextEntity != null ? new MessageTextDto
                     {
@@ -2201,7 +2201,7 @@ namespace Messenger.Services.Services
 
 
         public Task<MessageDto> EditChannelMessageAsync(
-            long messageId, long editorUserId, long targetId,
+            long messageId, long editorUserId, string targetId,
             string? newMessageText = null, List<long>? fileIds = null, List<long>? fileIdsToRemove = null)
         {
             throw new NotImplementedException();

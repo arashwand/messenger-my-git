@@ -417,9 +417,9 @@ namespace Messenger.API.Hubs
 
             IEnumerable<UserDto> allUsers;
             if (groupType == ConstChat.ClassGroupType)
-                allUsers = await _classGroupService.GetClassGroupMembersInternalAsync(int.Parse(groupId));
+                allUsers = await _classGroupService.GetClassGroupMembersInternalAsync(long.Parse(groupId));
             else
-                allUsers = await _channelService.GetChannelMembersInternalAsync(int.Parse(groupId));
+                allUsers = await _channelService.GetChannelMembersInternalAsync(long.Parse(groupId));
 
             return allUsers.Select(u => new { UserId = u.UserId, UserName = u.NameFamily, ProfilePic = u.ProfilePicName, IsOnline = onlineSet.Contains(u.UserId) }).Cast<object>().ToList();
         }
@@ -669,11 +669,11 @@ namespace Messenger.API.Hubs
                 // فاز 2: بررسی پیامهای حجیم (با 3 یا بیشتر فایل پیوست)
                 if (request.FileAttachementIds != null && request.FileAttachementIds.Count >= 3)
                 {
-                    _logger.LogInformation("Queueing message with {FileCount} attachments with HIGH priority", 
+                    _logger.LogInformation("Queueing message with {FileCount} attachments with HIGH priority",
                         request.FileAttachementIds.Count);
                     return (true, MessagePriority.High);
                 }
-
+                }
                 // فاز 4: آماده برای افزودن در آینده
                 // - Scheduled Messages: پیامهای برنامهریزی شده
 
