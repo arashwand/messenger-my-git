@@ -56,6 +56,37 @@ namespace Messenger.Services.Services
         /// <param name="messageText"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
+        public async Task<MessageDto> SendPrivateMessageAsync(long senderUserId, string conversationId, string messageText,
+            List<long>? fileIds = null, long? replyToMessageId = null, bool isPortalMessage = false)
+        {
+            if (!Guid.TryParse(conversationId, out var convIdGuid))
+            {
+                throw new ArgumentException("Invalid GUID format for conversationId.", nameof(conversationId));
+            }
+
+            var conversation = await _context.PrivateChatConversations
+                .FirstOrDefaultAsync(c => c.ConversationId == convIdGuid);
+
+            if (conversation == null)
+            {
+                throw new KeyNotFoundException("Private chat session not found.");
+            }
+
+            if (senderUserId != conversation.User1Id && senderUserId != conversation.User2Id)
+            {
+                throw new UnauthorizedAccessException("Sender is not a participant in this conversation.");
+            }
+
+            long receiverUserId = (senderUserId == conversation.User1Id) ? conversation.User2Id : conversation.User1Id;
+
+            var resultDto = await SendPrivateMessageAsync(senderUserId, receiverUserId, messageText, fileIds, replyToMessageId, isPortalMessage);
+
+            // The hub needs the receiver's ID to construct the signalR group name
+            resultDto.GroupId = receiverUserId;
+
+            return resultDto;
+        }
+
         public async Task<MessageDto> SendPrivateMessageAsync(long senderUserId, long receiverUserId, string messageText,
             List<long>? fileIds = null, long? replyToMessageId = null, bool isPortalMessage = false)
         {
@@ -114,10 +145,20 @@ namespace Messenger.Services.Services
         /// <param name="isPortalMessage">اگه ارسال کننده پرتال بود</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, long chatId, string chatType, string messageText,
+        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, string chatId, string chatType, string messageText,
              List<long>? fileIds = null, long? replyToMessageId = null, bool isPin = false, bool isPortalMessage = false)
         {
-            _logger.LogInformation($"Attempting to send class group message from {senderUserId} to class {chatId}");
+            if (chatType == ConstChat.PrivateType)
+            {
+                return await SendPrivateMessageAsync(senderUserId, chatId, messageText, fileIds, replyToMessageId, isPortalMessage);
+            }
+
+            if (!long.TryParse(chatId, out var numericChatId))
+            {
+                throw new ArgumentException("Invalid ChatId format for non-private chat.", nameof(chatId));
+            }
+
+            _logger.LogInformation($"Attempting to send class group message from {senderUserId} to class {numericChatId}");
 
             // بررسی اینکه ارسال کننده عضو این گروه است یا خیر
             //  فعلا تا تصمیم گیری نهایی این رو معلق میکنیم
@@ -129,8 +170,8 @@ namespace Messenger.Services.Services
             //else
             //{
             hasAccess = chatType == ConstChat.ClassGroupType ?
-           await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, chatId)
-           : await _channelService.IsUserMemberOfChannelAsync(senderUserId, chatId);
+           await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, numericChatId)
+           : await _channelService.IsUserMemberOfChannelAsync(senderUserId, numericChatId);
             //}
             // بدست اوردن نقش کاربر
             var user = await _userService.GetUserByIdAsync(senderUserId);
@@ -1962,9 +2003,28 @@ namespace Messenger.Services.Services
         /// <param name="fileIds">فایلهای جدیدی که ممکن است اضافه شده باشند</param>
         /// <param name="fileIdsToRemove">فایلهایی که باید حذف شوند</param>
         /// <returns></returns>
-        public async Task<MessageDto> EditMessageAsync(long messageId, long editorUserId, long targetId, string groupType,
+        public async Task<MessageDto> EditMessageAsync(long messageId, long editorUserId, string targetId, string groupType,
              string? newMessageText = null, List<long>? fileIds = null, List<long>? fileIdsToRemove = null)
         {
+            long numericTargetId;
+
+            if (groupType == ConstChat.PrivateType)
+            {
+                if (!Guid.TryParse(targetId, out var convIdGuid))
+                    throw new ArgumentException("Invalid GUID format for conversationId.", nameof(targetId));
+
+                var conversation = await _context.PrivateChatConversations.FirstOrDefaultAsync(c => c.ConversationId == convIdGuid);
+                if (conversation == null)
+                    throw new KeyNotFoundException("Private chat session not found.");
+
+                numericTargetId = (editorUserId == conversation.User1Id) ? conversation.User2Id : conversation.User1Id;
+            }
+            else
+            {
+                if (!long.TryParse(targetId, out numericTargetId))
+                    throw new ArgumentException("Invalid TargetId format for non-private chat.", nameof(targetId));
+            }
+
             _logger.LogInformation($"Attempting to edit class group message {messageId} by user {editorUserId}");
 
             var filesToPermanentlyDelete = new List<string>();
@@ -1986,7 +2046,7 @@ namespace Messenger.Services.Services
 
                 // بررسی وجود پیام و دسترسی کاربر
                 var messageEntity = await _context.Messages
-                    .FirstOrDefaultAsync(m => m.MessageId == messageId && m.SenderUserId == editorUserId && m.OwnerId == targetId);
+                    .FirstOrDefaultAsync(m => m.MessageId == messageId && m.SenderUserId == editorUserId && m.OwnerId == numericTargetId);
 
                 if (messageEntity == null)
                     throw new Exception("Message not found");
@@ -1998,9 +2058,12 @@ namespace Messenger.Services.Services
                     throw new Exception("You can only edit your own messages");
 
                 // بررسی عضویت در گروه کلاسی
-                var isMember = await _classGroupService.IsUserMemberOfClassGroupAsync(editorUserId, targetId);
-                if (!isMember)
-                    throw new Exception("User is not a member of this class group");
+                if (groupType == ConstChat.ClassGroupType)
+                {
+                    var isMember = await _classGroupService.IsUserMemberOfClassGroupAsync(editorUserId, numericTargetId);
+                    if (!isMember)
+                        throw new Exception("User is not a member of this class group");
+                }
 
                 // بررسی محدودیت زمانی برای ویرایش 
                 var timeLimit = TimeSpan.FromMinutes(_timeSettings.TimeToEditMessagesInMinutes);
@@ -2111,6 +2174,10 @@ namespace Messenger.Services.Services
                 var updatedMessage = await GetMessageByIdAsync(editorUserId, messageId);
 
                 //ساخت مدل کامل جهت برگرداندن
+                if (groupType == ConstChat.PrivateType)
+                {
+                    updatedMessage.GroupId = numericTargetId;
+                }
 
                 _logger.LogInformation($"Successfully edited class group message {messageId}");
 
@@ -2518,7 +2585,33 @@ namespace Messenger.Services.Services
 
         #endregion
 
+        public async Task<long> GetOtherUserIdInPrivateChat(string conversationId, long currentUserId)
+        {
+            if (!Guid.TryParse(conversationId, out var convIdGuid))
+            {
+                _logger.LogWarning("Invalid GUID format passed to GetOtherUserIdInPrivateChat: {ConversationId}", conversationId);
+                return 0;
+            }
 
+            var conversation = await _context.PrivateChatConversations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.ConversationId == convIdGuid);
+
+            if (conversation == null)
+            {
+                _logger.LogWarning("No conversation found for GUID: {ConversationId}", conversationId);
+                return 0;
+            }
+
+            if (currentUserId == conversation.User1Id)
+                return conversation.User2Id;
+
+            if (currentUserId == conversation.User2Id)
+                return conversation.User1Id;
+
+            _logger.LogWarning("User {CurrentUserId} is not a participant in conversation {ConversationId}", currentUserId, conversationId);
+            return 0; // User is not part of this conversation
+        }
     }
 }
 

@@ -490,7 +490,24 @@ namespace Messenger.API.Hubs
             }
 
             // ارسال فوری (کد قبلی)
-            var savedMessageDto = await _messageService.SendGroupMessageAsync(request.UserId, request.GroupId, request.GroupType, request.MessageText, request.FileAttachementIds, request.ReplyToMessageId);
+            long? groupId = null;
+            if (request.GroupType != ConstChat.PrivateType && request.GroupType != "Private")
+            {
+                if (long.TryParse(request.GroupId, out var id))
+                {
+                    groupId = id;
+                }
+                else
+                {
+                    await Clients.Caller.SendAsync("SendMessageError", new { request.ClientMessageId, Error = "Invalid GroupId format." });
+                    return;
+                }
+            }
+
+            var savedMessageDto = await _messageService.SendGroupMessageAsync(request.UserId,
+                request.GroupType == ConstChat.PrivateType ? request.GroupId : groupId.ToString(),
+                request.GroupType, request.MessageText, request.FileAttachementIds, request.ReplyToMessageId);
+
             if (savedMessageDto == null)
             {
                 await Clients.Caller.SendAsync("SendMessageError", request.ClientMessageId);
@@ -504,28 +521,27 @@ namespace Messenger.API.Hubs
             
             if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
             {
-                // برای Private: استفاده از PrivateChatHelper
-                var senderId = request.UserId;
-                var receiverId = request.GroupId; // در Private، GroupId همان otherUserId است
-                
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
+                // For private chats, the service layer resolves the GUID to the sender and receiver.
+                // The DTO returns the other user's ID in the 'GroupId' field.
+                long receiverId = savedMessageDto.GroupId;
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(request.UserId, receiverId);
                 
                 // تنظیم ChatKey و GroupType
                 savedMessageDto.ChatKey = groupKey;
                 savedMessageDto.GroupType = "Private";
                 
-                _logger.LogInformation($"Private message: SenderId={senderId}, ReceiverId={receiverId}, ChatKey={groupKey}");
+                _logger.LogInformation($"Private message: SenderId={request.UserId}, ReceiverId={receiverId}, ChatKey={groupKey}");
             }
             else
             {
                 // برای Group/Channel
-                groupKey = GenerateSignalRGroupKey.GenerateKey(request.GroupId, request.GroupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey((long)groupId, request.GroupType);
                 
                 savedMessageDto.ChatKey = groupKey;
                 savedMessageDto.GroupType = request.GroupType;
-                savedMessageDto.GroupId = request.GroupId;
+                savedMessageDto.GroupId = (long)groupId;
                 
-                _logger.LogInformation($"Group message: GroupId={request.GroupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
+                _logger.LogInformation($"Group message: GroupId={groupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
             }
 
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
@@ -558,7 +574,7 @@ namespace Messenger.API.Hubs
             if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
             {
                 // برای Private: فقط گیرنده را در نظر بگیر
-                var receiverId = request.GroupId; // در Private، GroupId همان receiverId است
+                var receiverId = savedMessageDto.GroupId;
                 members = new[] { new UserDto { UserId = receiverId } };
             }
             else if (request.GroupType == ConstChat.ClassGroupType)
@@ -623,13 +639,21 @@ namespace Messenger.API.Hubs
                     return (true, MessagePriority.Low);
                 }
 
-                // فاز 1: بررسی تعداد اعضای گروه (Canary Deployment)
-                var memberCount = request.GroupType == ConstChat.ClassGroupType
-                    ? await _classGroupService.GetClassGroupMembersCountAsync(request.GroupId)
-                    : await _channelService.GetChannelMembersCountAsync(request.GroupId);
-
-                if (memberCount > 50)
+                if (request.GroupType != ConstChat.PrivateType)
                 {
+                    if (!long.TryParse(request.GroupId, out var groupId))
+                    {
+                        // Handle error for non-private chats with invalid group id
+                        return (false, MessagePriority.Normal);
+                    }
+
+                    // فاز 1: بررسی تعداد اعضای گروه (Canary Deployment)
+                    var memberCount = request.GroupType == ConstChat.ClassGroupType
+                        ? await _classGroupService.GetClassGroupMembersCountAsync(groupId)
+                        : await _channelService.GetChannelMembersCountAsync(groupId);
+
+                    if (memberCount > 50)
+                    {
                     // گروههای بزرگتر از 200 نفر با اولویت بالا
                     if (memberCount > 200)
                     {
@@ -670,7 +694,24 @@ namespace Messenger.API.Hubs
 
             try
             {
-                var savedMessageDto = await _messageService.EditMessageAsync(request.MessageId, request.UserId, request.GroupId, request.GroupType, request.MessageText, request.FileAttachementIds, request.FileIdsToRemove);
+                long? groupId = null;
+                if (request.GroupType != ConstChat.PrivateType && request.GroupType != "Private")
+                {
+                    if (long.TryParse(request.GroupId, out var id))
+                    {
+                        groupId = id;
+                    }
+                    else
+                    {
+                        // Handle error, maybe send a message back to the caller
+                        return;
+                    }
+                }
+
+                var savedMessageDto = await _messageService.EditMessageAsync(request.MessageId, request.UserId,
+                    request.GroupType == ConstChat.PrivateType ? request.GroupId : groupId.ToString(),
+                    request.GroupType, request.MessageText, request.FileAttachementIds, request.FileIdsToRemove);
+
                 if (savedMessageDto == null)
                 {
                     await Clients.Caller.SendAsync("EditMessageSentFailed", request.UserId, request.MessageId);
@@ -684,28 +725,25 @@ namespace Messenger.API.Hubs
                 
                 if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
                 {
-                    // برای Private: استفاده از PrivateChatHelper
-                    var senderId = request.UserId;
-                    var receiverId = request.GroupId; // در Private، GroupId همان otherUserId است
-                    
-                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
+                    long receiverId = savedMessageDto.GroupId;
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(request.UserId, receiverId);
                     
                     // تنظیم ChatKey و GroupType
                     savedMessageDto.ChatKey = groupKey;
                     savedMessageDto.GroupType = "Private";
                     
-                    _logger.LogInformation($"Private message edited: SenderId={senderId}, ReceiverId={receiverId}, ChatKey={groupKey}");
+                    _logger.LogInformation($"Private message edited: SenderId={request.UserId}, ReceiverId={receiverId}, ChatKey={groupKey}");
                 }
                 else
                 {
                     // برای Group/Channel
-                    groupKey = GenerateSignalRGroupKey.GenerateKey(request.GroupId, request.GroupType);
+                    groupKey = GenerateSignalRGroupKey.GenerateKey((long)groupId, request.GroupType);
                     
                     savedMessageDto.ChatKey = groupKey;
                     savedMessageDto.GroupType = request.GroupType;
-                    savedMessageDto.GroupId = request.GroupId;
+                    savedMessageDto.GroupId = (long)groupId;
                     
-                    _logger.LogInformation($"Group message edited: GroupId={request.GroupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
+                    _logger.LogInformation($"Group message edited: GroupId={groupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
                 }
 
                 await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
@@ -746,7 +784,7 @@ namespace Messenger.API.Hubs
             }
         }
 
-        public async Task Typing(long userId, int groupId, string groupType)
+        public async Task Typing(long userId, string groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
             var fullName = GetCurrentUserFullName();
@@ -754,12 +792,13 @@ namespace Messenger.API.Hubs
             string groupKey;
             if (groupType == ConstChat.PrivateType)
             {
-                // ✅ برای چت خصوصی
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, groupId);
+                var otherUserId = await _messageService.GetOtherUserIdInPrivateChat(groupId, userId);
+                if(otherUserId == 0) return;
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, otherUserId);
             }
             else
             {
-                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey(long.Parse(groupId), groupType);
             }
             
             _logger.LogInformation("Typing event sent for user {UserId} in group {GroupKey}", userId, groupKey);
@@ -772,18 +811,20 @@ namespace Messenger.API.Hubs
                 isBridgeSender: IsBridge());
         }
 
-        public async Task StopTyping(long userId, int groupId, string groupType)
+        public async Task StopTyping(long userId, string groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
             
             string groupKey;
             if (groupType == ConstChat.PrivateType)
             {
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, groupId);
+                var otherUserId = await _messageService.GetOtherUserIdInPrivateChat(groupId, userId);
+                if(otherUserId == 0) return;
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, otherUserId);
             }
             else
             {
-                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey(long.Parse(groupId), groupType);
             }
 
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
@@ -795,19 +836,30 @@ namespace Messenger.API.Hubs
                 isBridgeSender: IsBridge());
         }
 
-        public async Task MarkMessageAsRead(long currentUserId, int groupId, string groupType, long messageId)
+        public async Task MarkMessageAsRead(long currentUserId, string groupId, string groupType, long messageId)
         {
             if (currentUserId <= 0 || messageId <= 0) return;
             if (!IsBridge()) currentUserId = GetCurrentUserId();
 
-            _logger.LogInformation($"MarkMessageAsRead called:  userId={currentUserId}, groupId={groupId}, groupType={groupType}, messageId={messageId}");
+            _logger.LogInformation($"MarkMessageAsRead called: userId={currentUserId}, groupId={groupId}, groupType={groupType}, messageId={messageId}");
 
             try
             {
-                var senderUserId = await _messageService.MarkMessageAsReadAsync(messageId, currentUserId, groupId, groupType);
+                long targetId = 0;
+                if (groupType == ConstChat.PrivateType)
+                {
+                    targetId = await _messageService.GetOtherUserIdInPrivateChat(groupId, currentUserId);
+                    if (targetId == 0) return;
+                }
+                else
+                {
+                    if (!long.TryParse(groupId, out targetId)) return;
+                }
+
+                var senderUserId = await _messageService.MarkMessageAsReadAsync(messageId, currentUserId, targetId, groupType);
                 if (senderUserId.HasValue && senderUserId.Value > 0)
                 {
-                    await _redisUnreadManage.MarkMessageAsSeenAsync(currentUserId, messageId, groupId, groupType);
+                    await _redisUnreadManage.MarkMessageAsSeenAsync(currentUserId, messageId, targetId, groupType);
                     var seenCount = await _redisUnreadManage.GetMessageSeenCountAsync(messageId);
 
                     if (senderUserId.Value != currentUserId)
@@ -815,21 +867,19 @@ namespace Messenger.API.Hubs
                         await this.NotifyUserAndBridgeAsync(_logger, BridgeGroupName, senderUserId.Value, "MessageSeenUpdate", new object[] { messageId, currentUserId, seenCount, GetCurrentUserFullName() }, IsBridge());
                     }
 
-                    await _redisUnreadManage.SetLastReadMessageIdAsync(currentUserId, groupId, groupType, messageId);
-                    await _redisUnreadManage.DecrementUnreadCountAsync(currentUserId, groupId, groupType);
-                    var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(currentUserId, groupId, groupType);
+                    await _redisUnreadManage.SetLastReadMessageIdAsync(currentUserId, targetId, groupType, messageId);
+                    await _redisUnreadManage.DecrementUnreadCountAsync(currentUserId, targetId, groupType);
+                    var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(currentUserId, targetId, groupType);
 
                     _logger.LogInformation($"After mark as read: unreadCount={unreadCount}");
 
-                    // ✅ ارسال MessageSuccessfullyMarkedAsRead
                     if (IsBridge())
                         await Clients.Caller.SendAsync("MessageSuccessfullyMarkedAsRead", messageId, groupId, groupType, unreadCount);
                     else
                         await Clients.Client(Context.ConnectionId).SendAsync("MessageSuccessfullyMarkedAsRead", messageId, groupId, groupType, unreadCount);
 
-                    // ✅ ارسال UpdateUnreadCount برای آپدیت badge
-                    _logger.LogInformation($"🔔 Calling SendUnreadCountUpdateAsync for userId={currentUserId}, groupId={groupId}, groupType={groupType}, unreadCount={unreadCount}");
-                    await SendUnreadCountUpdateAsync(currentUserId, groupId, groupType, unreadCount, IsBridge());
+                    _logger.LogInformation($"🔔 Calling SendUnreadCountUpdateAsync for userId={currentUserId}, groupId={targetId}, groupType={groupType}, unreadCount={unreadCount}");
+                    await SendUnreadCountUpdateAsync(currentUserId, targetId, groupType, unreadCount, IsBridge());
                 }
             }
             catch (Exception ex)
@@ -838,19 +888,30 @@ namespace Messenger.API.Hubs
             }
         }
 
-        public async Task MarkAllMessagesAsRead(long currentUserId, int groupId, string groupType)
+        public async Task MarkAllMessagesAsRead(long currentUserId, string groupId, string groupType)
         {
             if (!IsBridge()) currentUserId = GetCurrentUserId();
 
-            if (groupType == ConstChat.ClassGroupType && !await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, groupId))
+            long targetId = 0;
+            if (groupType == ConstChat.PrivateType)
+            {
+                targetId = await _messageService.GetOtherUserIdInPrivateChat(groupId, currentUserId);
+                if (targetId == 0) return;
+            }
+            else
+            {
+                if (!long.TryParse(groupId, out targetId)) return;
+            }
+
+            if (groupType == ConstChat.ClassGroupType && !await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, targetId))
                 throw new UnauthorizedAccessException("User is not a member of the group.");
-            if (groupType == ConstChat.ChannelGroupType && !await _channelService.IsUserMemberOfChannelAsync(currentUserId, groupId))
+            if (groupType == ConstChat.ChannelGroupType && !await _channelService.IsUserMemberOfChannelAsync(currentUserId, targetId))
                 throw new UnauthorizedAccessException("User is not a member of the channel.");
 
             try
             {
-                await _redisUnreadManage.ResetUnreadCountAsync(currentUserId, groupId, groupType);
-                var allMessagesInChat = await _messageService.GetAllUnreadMessageInChat(currentUserId, groupId, groupType);
+                await _redisUnreadManage.ResetUnreadCountAsync(currentUserId, targetId, groupType);
+                var allMessagesInChat = await _messageService.GetAllUnreadMessageInChat(currentUserId, targetId, groupType);
 
                 if (allMessagesInChat == null || !allMessagesInChat.Any())
                 {
@@ -862,10 +923,10 @@ namespace Messenger.API.Hubs
                 }
 
                 long lastMessageIdInChat = allMessagesInChat.OrderByDescending(x => x.MessageId).First().MessageId;
-                await _redisUnreadManage.SetLastReadMessageIdAsync(currentUserId, groupId, groupType, lastMessageIdInChat);
+                await _redisUnreadManage.SetLastReadMessageIdAsync(currentUserId, targetId, groupType, lastMessageIdInChat);
 
                 var tasksMarkAsSeen = new List<Task>();
-                foreach (var msg in allMessagesInChat) tasksMarkAsSeen.Add(_redisUnreadManage.MarkMessageAsSeenAsync(currentUserId, msg.MessageId, groupId, groupType));
+                foreach (var msg in allMessagesInChat) tasksMarkAsSeen.Add(_redisUnreadManage.MarkMessageAsSeenAsync(currentUserId, msg.MessageId, targetId, groupType));
                 await Task.WhenAll(tasksMarkAsSeen);
 
                 var tasksNotify = new List<Task>();
@@ -879,7 +940,7 @@ namespace Messenger.API.Hubs
                 }
                 await Task.WhenAll(tasksNotify);
 
-                var finalUnreadCount = await _redisUnreadManage.GetUnreadCountAsync(currentUserId, groupId, groupType);
+                var finalUnreadCount = await _redisUnreadManage.GetUnreadCountAsync(currentUserId, targetId, groupType);
                 var processedIds = allMessagesInChat.Select(m => m.MessageId).ToList();
                 if (!IsBridge())
                     await Clients.User(currentUserId.ToString()).SendAsync("AllUnreadMessagesSuccessfullyMarkedAsRead", processedIds, groupId, groupType, finalUnreadCount);
