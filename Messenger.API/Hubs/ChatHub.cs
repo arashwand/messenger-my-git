@@ -424,16 +424,16 @@ namespace Messenger.API.Hubs
             return allUsers.Select(u => new { UserId = u.UserId, UserName = u.NameFamily, ProfilePic = u.ProfilePicName, IsOnline = onlineSet.Contains(u.UserId) }).Cast<object>().ToList();
         }
 
-        private (int groupId, string groupType) ParseGroupKey(string groupKey)
+        private (long groupId, string groupType) ParseGroupKey(string groupKey)
         {
             if (groupKey.StartsWith(ConstChat.ClassGroup))
             {
-                int.TryParse(groupKey.Substring(ConstChat.ClassGroup.Length), out int id);
+                long.TryParse(groupKey.Substring(ConstChat.ClassGroup.Length), out long id);
                 return (id, ConstChat.ClassGroupType);
             }
             if (groupKey.StartsWith(ConstChat.ChannelGroup))
             {
-                int.TryParse(groupKey.Substring(ConstChat.ChannelGroup.Length), out int id);
+                long.TryParse(groupKey.Substring(ConstChat.ChannelGroup.Length), out long id);
                 return (id, ConstChat.ChannelGroupType);
             }
             return (0, string.Empty);

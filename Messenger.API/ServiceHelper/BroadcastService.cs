@@ -359,7 +359,7 @@ namespace Messenger.API.ServiceHelper
                     var groupType = request.TargetType == ConstChat.ClassGroupType ? ConstChat.ClassGroupType : ConstChat.ChannelGroupType;
                     savedMessageDto = await _messageService.SendGroupMessageAsync(
                         senderUserId: senderUserId,
-                        classId: request.TargetId,
+                        chatId: request.TargetId.ToString(),
                         groupType: groupType,
                         messageText: request.MessageText,
                         files: request.FileIds,
