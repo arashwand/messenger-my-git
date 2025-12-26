@@ -27,8 +27,8 @@ namespace Messenger.Services.Interfaces
 
         Task<FileIdentifierDto?> ProcessFileChunkAsync(IFormFile file, string uploadId, int chunkIndex, int totalChunks, string originalFileName, long uploaderUserId);
 
-        Task<SharedContentDto> GetSharedContentForChatAsync(int chatId, string groupType);
-        Task<CountSharedContentDto> GetCountSharedContentForChatAsync(int chatId, string groupType);
+        Task<SharedContentDto> GetSharedContentForChatAsync(long chatId, string groupType);
+        Task<CountSharedContentDto> GetCountSharedContentForChatAsync(long chatId, string groupType);
 
 
         Task<byte[]> ReadFileAsync(string filePath);

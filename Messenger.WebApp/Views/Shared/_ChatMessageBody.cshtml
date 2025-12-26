@@ -35,7 +35,7 @@
     var chatType = ViewData["chatType"]?.ToString() ?? "ClassGroup";
 
     var pinnedMessageIdGenerated = "pinnedMessage_" + chatGroupId + "_" + chatType;
-
+    var otherUserId = ViewData["otherUserId"]?.ToString() ?? "0";
     var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
     var pinnedMessages = Model.Where(m => m.IsPin).OrderBy(m => m.PinnedAt);
 }
@@ -132,14 +132,17 @@
                         <i class="iconsax icon-btn" data-icon="menu-meatballs"> </i>
                     </a>
                     <ul class="dropdown-menu">
+                        @if (chatType != "Private")
+                        {
                         <li>
-                            <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@chatGroupId', '@chatType')">
+                            <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@(chatType == "Private" ? otherUserId : chatGroupId.ToString())', '@chatType')">
                                 <img src="/chatzy/assets/iconsax/group.svg" alt="group" />
 
                                 &nbsp;
                                 <span>اعضای گروه</span>
                             </a>
                         </li>
+                        }
                     </ul>
                 </div>
             </div>

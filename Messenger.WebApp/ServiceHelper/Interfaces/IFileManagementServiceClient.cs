@@ -28,7 +28,7 @@ namespace Messenger.WebApp.ServiceHelper.Interfaces
         Task<IEnumerable<FileListItem>> ListFilesAsync(string subDirectory = null);
         Task<FileRenameResult> RenameFileAsync(string filePath, string newFileName);
 
-        Task<CountSharedContentDto> GetFileCountsForChatAsync(int chatId, string groupType);
+        Task<CountSharedContentDto> GetFileCountsForChatAsync(long chatId, string groupType);
 
     }
 }

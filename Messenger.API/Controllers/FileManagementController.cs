@@ -63,7 +63,7 @@ namespace Messenger.API.Controllers
 
       
         [HttpGet("GetSharedFiles")]
-        public async Task<IActionResult> GetSharedFiles([FromQuery] int chatId, [FromQuery] string groupType)
+        public async Task<IActionResult> GetSharedFiles([FromQuery] long chatId, [FromQuery] string groupType)
         {
             if (chatId <= 0 || string.IsNullOrEmpty(groupType))
                 return BadRequest("Valid Chat ID and Group Type are required.");
@@ -87,7 +87,7 @@ namespace Messenger.API.Controllers
         /// <param name="groupType"></param>
         /// <returns></returns>
         [HttpGet("GetCountSharedFiles")]
-        public async Task<IActionResult> GetCountSharedFiles([FromQuery] int chatId, [FromQuery] string groupType)
+        public async Task<IActionResult> GetCountSharedFiles([FromQuery] long chatId, [FromQuery] string groupType)
         {
             if (chatId <= 0 || string.IsNullOrEmpty(groupType))
                 return BadRequest("Valid Chat ID and Group Type are required.");

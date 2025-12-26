@@ -899,7 +899,7 @@ namespace Messenger.Services.Services
         /// <param name="chatId"></param>
         /// <param name="groupType"></param>
         /// <returns></returns>
-        public async Task<CountSharedContentDto> GetCountSharedContentForChatAsync(int chatId, string groupType)
+        public async Task<CountSharedContentDto> GetCountSharedContentForChatAsync(long chatId, string groupType)
         {
             var countSharedContent = new CountSharedContentDto();
 

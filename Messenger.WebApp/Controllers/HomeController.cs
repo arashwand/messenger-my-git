@@ -243,27 +243,23 @@ namespace Messenger.WebApp.Controllers
                     return BadRequest("User ID not found in claims.");
                 }
 
-                List<MessageDto> messages = new List<MessageDto>();
+                IEnumerable<MessageDto> messages;
 
-                if (loadBothDirections && messageId > 0)
+                if (groupType == ConstChat.PrivateType)
                 {
-                    // برای دریافت پیامهای پین شده که ممکن است خیلی قدیمی باشند 25 واحد به ایدی اضافه میکنم
-                    // به این دلیل که 25 واحد جدید تر باشه و 25 تا قدیمی تر از ایدی مورد نظر
-                    // messageId += 25;
-                    var olderMessages = await _messageService.GetChatMessagesAsync(chatId, groupType, 1, 25, messageId, true, loadBothDirections);
-
-                    messages.AddRange(olderMessages ?? new List<MessageDto>());
-
-                    // ✅ تصحیح: مرتب‌سازی صعودی (قدیم → جدید)
-                    messages = messages.OrderByDescending(m => m.MessageDateTime).ToList();
+                    if (!Guid.TryParse(chatId, out var conversationId))
+                    {
+                        return BadRequest("Invalid GUID format for private chat ID.");
+                    }
+                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, pageSize, messageId, loadOlder, loadBothDirections);
                 }
                 else
                 {
-                    // کد اصلی: فقط قدیمی‌ها
-                    var olderMessages = await _messageService.GetChatMessagesAsync(chatId, groupType, pageNumber, pageSize, messageId, loadOlder, false);
-
-                    // ✅ مرتب‌سازی صعودی برای بارگذاری قدیمی
-                    messages = olderMessages.OrderBy(m => m.MessageId).ToList();
+                    if (!long.TryParse(chatId, out var longChatId))
+                    {
+                        return BadRequest("Invalid chat ID.");
+                    }
+                    messages = await _messageService.GetChatMessagesAsync(longChatId, groupType, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
                 }
 
                 var payloadList = new List<object>();
@@ -354,12 +350,23 @@ namespace Messenger.WebApp.Controllers
                 {
                     if (!Guid.TryParse(chatId, out var conversationId))
                     {
-                        return BadRequest("Invalid GUID format for private chat ID.");
+                        // It might be the initial load with otherUserId
+                        if (long.TryParse(chatId, out var otherUserId))
+                        {
+                            var privateChat = await _messageService.GetPrivateMessagesAsync(otherUserId, pageSize);
+                            messages = privateChat.Messages;
+                            chatKey = privateChat.ConversationId.ToString();
+                            ViewData["otherUserId"] = otherUserId;
+                        }
+                        else
+                        {
+                            return BadRequest("Invalid format for private chat ID.");
+                        }
                     }
-                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, pageSize);
-                    // For private chats, the other user's name needs to be fetched differently now.
-                    // This part is simplified as the main goal is fixing the message loading.
-                    // A proper implementation would involve another service call or a modified DTO.
+                    else
+                    {
+                        messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, pageSize);
+                    }
                     chatName = "Private Chat";
                 }
                 else
