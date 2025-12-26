@@ -250,9 +250,20 @@
                     let chatId = null;
 
                     if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
-                        // private_1_124644  => groupType = 'private', chatId = '1_124644'
-                        chatId = parts.slice(1).join('_');
-                        console.log('--private-----------------------------chatid :', chatId);
+                        const currentUserId = parseInt($('#userId').val());
+                        const id1 = parseInt(parts[1]);
+                        const id2 = parseInt(parts[2]);
+
+                        if (!isNaN(currentUserId) && !isNaN(id1) && !isNaN(id2)) {
+                            // Find the other user's ID
+                            const otherUserId = currentUserId === id1 ? id2 : id1;
+                            chatId = otherUserId.toString();
+                            console.log('--private-- receiverId :', chatId);
+                        } else {
+                            // Fallback or error handling if IDs are not numbers
+                            chatId = parts.slice(1).join('_');
+                            console.error('Could not parse private chat user IDs.');
+                        }
                     } else if (parts.length === 2) {
                         // Normal case like ClassGroup_2
                         const a = parts[0], b = parts[1];
@@ -418,8 +429,17 @@
                         let chatId = null;
 
                         if (groupType.toLowerCase() === 'private' && parts.length >= 3) {
-                            // private_1_124644 => groupType = 'private', chatId = '1_124644'
-                            chatId = parts.slice(1).join('_');
+                            const currentUserId = parseInt($('#userId').val());
+                            const id1 = parseInt(parts[1]);
+                            const id2 = parseInt(parts[2]);
+
+                            if (!isNaN(currentUserId) && !isNaN(id1) && !isNaN(id2)) {
+                                const otherUserId = currentUserId === id1 ? id2 : id1;
+                                chatId = otherUserId.toString();
+                            } else {
+                                chatId = parts.slice(1).join('_');
+                                console.error('Could not parse private chat user IDs from popstate.');
+                            }
                         } else if (parts.length === 2) {
                             const a = parts[0], b = parts[1];
                             if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
