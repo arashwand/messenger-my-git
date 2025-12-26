@@ -16,51 +16,36 @@ window.chatSignalRHandlers = (function () {
      */
     function registerHandlers(connection, currentUser) {
 
+       
         // دریافت پیام جدید
         connection.on("ReceiveMessage", function (message) {
             console.log("📩 ReceiveMessage handler triggered");
-            console.log("   Message:", message);
-            console.log("   window.activeGroupId:", window.activeGroupId);
-            console.log("   message.chatKey:", message.chatKey);
-            console.log("   message.groupId:", message.groupId);
-            console.log("   message.groupType:", message.groupType); 
-            
-            // ✅ دریافت چت فعلی
-            const activeChatKey = window.activeGroupId; // مثلاً "private_5_10" یا "ClassGroup_123"
-            
-            // اگر activeGroupId تنظیم نشده، پیام را نمایش نده
-            if (!activeChatKey) {
-                console.warn("⚠️ activeChatKey not set, cannot filter messages");
-                return;
-            }
-            
-            // ✅ فیلتر: فقط پیامهای چت فعلی
-            const isForActiveChat = (message.chatKey === activeChatKey);
-            
-            console.log(`📍 Active chat: ${activeChatKey}, Message chat: ${message.chatKey}, Match: ${isForActiveChat}`);
-            
-            // نمایش پیام فقط اگر:
-            // 1. برای چت فعلی است AND
-            // 2. (از کاربر دیگری است OR پیام سیستمی است)
-            if (isForActiveChat) {
-                if (message.senderUserId !== currentUser) {
-                    if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
-                        window.chatUIRenderer.displayMessage(message);
-                    } else {
-                        console.error("❌ chatUIRenderer.displayMessage not available");
-                    }
-                } else if (message.isSystemMessage) {
-                    console.log("-------------------message receive from portal-------------------");
-                    if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
-                        window.chatUIRenderer.displayMessage(message);
-                    } else {
-                        console.error("❌ chatUIRenderer.displayMessage not available");
-                    }
+            console.log("   Message details:", {
+                messageId: message.messageId,
+                groupId: message.groupId,
+                groupType: message.groupType,
+                chatKey: message.chatKey,
+                senderUserId: message.senderUserId,
+                currentUserId: currentUser,
+                activeGroupId: window.activeGroupId
+            });
+
+            // ✅ بدون چک activeGroupId - displayMessage خودش مدیریت می‌کند
+            if (message.senderUserId !== currentUser) {
+                if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
+                    window.chatUIRenderer.displayMessage(message);
                 } else {
-                    console.log("⏭️ Skipping own message (already displayed optimistically)");
+                    console.error("chatUIRenderer or displayMessage not available");
+                }
+            } else if (message.isSystemMessage) {
+                console.log("System message received from portal");
+                if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
+                    window.chatUIRenderer.displayMessage(message);
+                } else {
+                    console.error("chatUIRenderer or displayMessage not available");
                 }
             } else {
-                console.log("⏭️ Message not for active chat - skipped");
+                console.log("Message from self - skipping display (will be shown via MessageSentSuccessfully)");
             }
         });
 

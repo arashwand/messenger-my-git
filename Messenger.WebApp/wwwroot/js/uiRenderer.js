@@ -446,6 +446,42 @@ window.chatUIRenderer = (function ($) {
     // =================================================
 
     /**
+    * تولید کلید badge بر اساس نوع چت
+    * این تابع در چندین جا استفاده می‌شود
+    */
+    function generateBadgeKeyForGroup(groupId, groupType) {
+        if (groupType === 'Private') {
+            const currentUserId = parseInt($('#userId').val());
+
+            if (!currentUserId) {
+                console.error("❌ currentUserId not found for generating Private badge key");
+                return `Private_${groupId}`; // Fallback
+            }
+
+            const receiverUserId = groupId;
+            const minId = Math.min(currentUserId, receiverUserId);
+            const maxId = Math.max(currentUserId, receiverUserId);
+
+            return `private_${minId}_${maxId}`;
+        } else {
+            return `${groupType}_${groupId}`;
+        }
+    }
+
+    /**
+     * تولید کلید badge بر اساس message object
+     * (استفاده در displayMessage)
+     */
+    function generateBadgeKey(message) {
+        if (message.groupType === 'Private' && message.chatKey) {
+            return message.chatKey;
+        } else {
+            return `${message.groupType}_${message.groupId}`;
+        }
+    }
+
+
+    /**
      * لاگ اطلاعات دریافت پیام
      */
     function logMessageReceived(message) {
@@ -649,12 +685,12 @@ window.chatUIRenderer = (function ($) {
     }
 
     /**
-     * به‌روزرسانی badge برای چت غیرفعال
-     */
+    * به‌روزرسانی badge برای چت غیرفعال
+    */
     function updateUnreadBadgeForInactiveChat(message) {
         console.log('❌ Message NOT in active chat - updating unread badge');
 
-        const badgeKey = generateBadgeKey(message);
+        const badgeKey = generateBadgeKey(message); // ✅ استفاده از تابع موجود
         console.log(`   Looking for badge with key: ${badgeKey}`);
 
         const unreadBadge = $(`#unreadCountBadge_${badgeKey}`);
@@ -663,7 +699,7 @@ window.chatUIRenderer = (function ($) {
             let currentCount = parseInt(unreadBadge.text()) || 0;
             currentCount++;
             unreadBadge.text(currentCount).removeClass('d-none');
-            console.log(`✅ Updated badge for ${badgeKey}: ${currentCount}`);
+            console.log(`✅ Updated badge for ${badgeKey}:  ${currentCount}`);
         } else {
             console.warn(`⚠️ Badge not found for key: ${badgeKey}`);
             console.warn(`   Tried selector: #unreadCountBadge_${badgeKey}`);
@@ -1206,22 +1242,25 @@ window.chatUIRenderer = (function ($) {
     }
 
     /**
-     * وقتی پیام توسط یک فرد خوانده شد
-     */
+ * وقتی پیام توسط یک فرد خوانده شد
+ */
     function handleMessageSuccessfullyMarkedAsRead(messageId, groupId, groupType, unreadCount) {
-        console.log(`MessageSuccessfullyMarkedAsRead called: messageId=${messageId}, groupId=${groupId}, groupType=${groupType}, unreadCount=${unreadCount}, time=${new Date().toISOString()}`);
+        console.log(`MessageSuccessfullyMarkedAsRead called:  messageId=${messageId}, groupId=${groupId}, groupType=${groupType}, unreadCount=${unreadCount}, time=${new Date().toISOString()}`);
+
         const messageElement = $('#message-' + messageId);
         if (messageElement.length) {
             messageElement.attr('data-is-read', 'true');
         }
 
-        const key = `${groupType}_${groupId}`;
-        updateUnreadCountForGroup(key, unreadCount)
+        // ✅ ساخت کلید صحیح برای badge
+        const key = generateBadgeKeyForGroup(groupId, groupType);
+        console.log(`✅ Generated badge key: ${key}`);
+        updateUnreadCountForGroup(key, unreadCount);
     }
 
     /**
-     * وقتی کاربر بر روی مشاهده همه کلیک کرد
-     */
+    * وقتی کاربر بر روی مشاهده همه کلیک کرد
+    */
     function handleAllUnreadMessageSuccessfullyMarkedAsRead(messageIds, groupId, groupType, unreadCount) {
         console.log(`handleAllUnreadMessageSuccessfullyMarkedAsRead called: messageIds = ${messageIds}, groupId = ${groupId}, groupType = ${groupType}, unreadCount = ${unreadCount}, time = ${new Date().toISOString()}`);
 
@@ -1233,8 +1272,10 @@ window.chatUIRenderer = (function ($) {
             $(`#message-${messageId}`).attr('data-is-read', 'true');
         });
 
-        const key = `${groupType}_${groupId}`;
-        updateUnreadCountForGroup(key, unreadCount)
+        // ✅ ساخت کلید صحیح برای badge
+        const key = generateBadgeKeyForGroup(groupId, groupType);
+        console.log(`✅ Generated badge key: ${key}`);
+        updateUnreadCountForGroup(key, unreadCount);
 
         if (window.chatMessageManager && window.chatMessageManager.setIsMarkingAllMessagesAsRead) {
             window.chatMessageManager.setIsMarkingAllMessagesAsRead(false);
@@ -1250,6 +1291,7 @@ window.chatUIRenderer = (function ($) {
             }
         }, 100);
     }
+
 
     /**
      * مدیریت حذف پیام
