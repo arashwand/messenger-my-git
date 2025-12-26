@@ -350,17 +350,33 @@ namespace Messenger.WebApp.Controllers
 
                 _logger.LogInformation($"GetChatMessages: Loading initial messages for chat {chatId} (type: {groupType})");
 
-                // دریافت پیامهای اولیه بدون شناخت یک پیام هدف
-                // سرور خود تصمیم میگیرد که کدام پیامها را بفرستد
-                var messages = await _messageService.GetChatMessagesAsync(
-                    chatId,
-                    groupType,
-                    pageNumber,
-                    pageSize,
-                    messageId: 0,  // عدم تعیین پیام خاص
-                    loadOlder: false,
-                    loadBothDirections: false
-                );
+                if (groupType.Contains("private"))
+                {
+                    groupType = ConstChat.PrivateType;
+                }else if (groupType.Contains("classgroup"))
+                {
+                    groupType = ConstChat.ClassGroupType;
+                }
+                else if (groupType.Contains("channelgroup"))
+                {
+                    groupType = ConstChat.ChannelGroupType;
+                }
+                else
+                {
+                    return BadRequest("chat type not found in claims.");
+                }
+
+                    // دریافت پیامهای اولیه بدون شناخت یک پیام هدف
+                    // سرور خود تصمیم میگیرد که کدام پیامها را بفرستد
+                    var messages = await _messageService.GetChatMessagesAsync(
+                        chatId,
+                        groupType,
+                        pageNumber,
+                        pageSize,
+                        messageId: 0,  // عدم تعیین پیام خاص
+                        loadOlder: false,
+                        loadBothDirections: false
+                    );
 
                 // ✅ تنظیم نام چت بر اساس نوع
                 string chatName = "چت";
