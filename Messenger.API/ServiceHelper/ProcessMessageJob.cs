@@ -62,12 +62,12 @@ namespace Messenger.API.ServiceHelper
 
                 // 1. ذخیره پیام در دیتابیس
                 var savedMessageDto = await _messageService.SendGroupMessageAsync(
-                    queuedMessage.UserId,
-                    queuedMessage.GroupId,
-                    queuedMessage.GroupType,
-                    queuedMessage.MessageText,
-                    queuedMessage.FileAttachementIds,
-                    queuedMessage.ReplyToMessageId);
+                    senderUserId: queuedMessage.UserId,
+                    classId: queuedMessage.GroupId,
+                    groupType: queuedMessage.GroupType,
+                    messageText: queuedMessage.MessageText,
+                    files: queuedMessage.FileAttachementIds,
+                    replyToMessageId: queuedMessage.ReplyToMessageId);
 
                 if (savedMessageDto == null)
                 {
