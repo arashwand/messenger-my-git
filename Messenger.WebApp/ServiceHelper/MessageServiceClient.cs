@@ -44,10 +44,17 @@ namespace Messenger.WebApp.ServiceHelper
             return await _httpClient.GetFromJsonAsync<MessageDto>($"api/messages/{messageId}");
         }
 
-        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesAsync(long userId1, long userId2, int pageNumber, int pageSize, long messageId, bool loadOlder)
+        public async Task<PrivateChatDto> GetPrivateMessagesAsync(long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
+        {
+            var response = await _httpClient.GetFromJsonAsync<PrivateChatDto>(
+                $"api/messages/private/{otherUserId}?pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}&loadBothDirections={loadBothDirections}");
+            return response;
+        }
+
+        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(Guid conversationId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<MessageDto>>(
-                $"api/messages/private?userId1={userId1}&userId2={userId2}&pageNumber={pageNumber}&pageSize={pageSize}");
+                $"api/messages/private/conversation/{conversationId}?pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}&loadBothDirections={loadBothDirections}");
             return response ?? new List<MessageDto>();
         }
 

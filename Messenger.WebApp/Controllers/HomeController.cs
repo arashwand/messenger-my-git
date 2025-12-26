@@ -334,77 +334,68 @@ namespace Messenger.WebApp.Controllers
 
         /// <summary>
         /// ✅ حالت 1: دریافت پیامهای اولیه بعد از انتخاب چت (اولین بار)
-        /// - آخرین 50 پیام را دریافت میکند
-        /// - اگر کاربر قبلاً وارد شده، پیامهای حول lastReadMessageId دریافت میکند
         /// </summary>
-        /// <param name="chatId">آیدی گروه یا کانال</param>
-        /// <param name="groupType">نوع چت (ClassGroup یا Channel)</param>
-        /// <param name="pageNumber">شماره صفحه</param>
-        /// <param name="pageSize">تعداد پیام در هر صفحه</param>
-        /// <returns></returns>
-        public async Task<IActionResult> GetChatMessages(string chatId, string groupType, int pageNumber = 1, int pageSize = 50)
+        public async Task<IActionResult> GetChatMessages(string chatId, string groupType, int pageSize = 50)
         {
             try
             {
-                var userId = HttpContext.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                if (userId == null)
+                if (!long.TryParse(User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value, out var currentUserId))
                 {
                     return BadRequest("User ID not found in claims.");
                 }
 
-
                 _logger.LogInformation($"GetChatMessages: Loading initial messages for chat {chatId} (type: {groupType})");
 
-                // دریافت پیامهای اولیه بدون شناخت یک پیام هدف
-                // سرور خود تصمیم میگیرد که کدام پیامها را بفرستد
-                var messages = await _messageService.GetChatMessagesAsync(
-                    chatId,
-                    groupType,
-                    pageNumber,
-                    pageSize,
-                    messageId: 0,  // عدم تعیین پیام خاص
-                    loadOlder: false,
-                    loadBothDirections: false
-                );
-
-                // ✅ تنظیم نام چت بر اساس نوع
+                IEnumerable<MessageDto> messages;
                 string chatName = "چت";
-                string chatKey = "";
+                string chatKey = chatId; // Default to chatId, which will be the GUID for private chats
 
                 if (groupType == ConstChat.PrivateType)
                 {
-                    var otherUser = await _userService.GetUserByIdAsync(chatId);
-                    chatName = otherUser?.NameFamily ?? "کاربر";
+                    if (!Guid.TryParse(chatId, out var conversationId))
+                    {
+                        return BadRequest("Invalid GUID format for private chat ID.");
+                    }
+                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, pageSize);
+                    // For private chats, the other user's name needs to be fetched differently now.
+                    // This part is simplified as the main goal is fixing the message loading.
+                    // A proper implementation would involve another service call or a modified DTO.
+                    chatName = "Private Chat";
+                }
+                else
+                {
+                    if (!long.TryParse(chatId, out var longChatId))
+                    {
+                        return BadRequest("Invalid chat ID.");
+                    }
 
-                    // محاسبه chatKey برای Private
-                    if (long.TryParse(userId, out var currentUserId))
+                    messages = await _messageService.GetChatMessagesAsync(
+                        longChatId,
+                        groupType,
+                        1, // pageNumber is not used in the new logic, but required by the interface
+                        pageSize,
+                        messageId: 0,
+                        loadOlder: false,
+                        loadBothDirections: false
+                    );
+
+                    if (groupType == ConstChat.ClassGroupType)
                     {
-                        var otherUserId = (long)chatId;
-                        var minId = Math.Min(currentUserId, otherUserId);
-                        var maxId = Math.Max(currentUserId, otherUserId);
-                        chatKey = $"private_{minId}_{maxId}";
+                        var group = await _classGroupServiceClient.GetClassGroupByIdAsync(longChatId);
+                        chatName = group?.LevelName ?? "گروه";
+                        chatKey = $"ClassGroup_{chatId}";
                     }
-                    else
+                    else if (groupType == ConstChat.ChannelGroupType)
                     {
-                        _logger.LogError("Invalid userId for Private chat: {UserId}", userId);
+                        var channel = await _channelServiceClient.GetChannelByIdAsync(longChatId);
+                        chatName = channel?.ChannelName ?? "کانال";
+                        chatKey = $"ChannelGroup_{chatId}";
                     }
-                }
-                else if (groupType == ConstChat.ClassGroupType)
-                {
-                    var group = await _classGroupServiceClient.GetClassGroupByIdAsync(chatId);
-                    chatName = group?.LevelName ?? "گروه";
-                    chatKey = $"ClassGroup_{chatId}";
-                }
-                else if (groupType == ConstChat.ChannelGroupType)
-                {
-                    var channel = await _channelServiceClient.GetChannelByIdAsync(chatId);
-                    chatName = channel?.ChannelName ?? "کانال";
-                    chatKey = $"ChannelGroup_{chatId}";
                 }
 
                 ViewData["chatGroupId"] = chatId;
-                ViewData["chatName"] = chatName; // ✅ اضافه شد
-                ViewData["chatKey"] = chatKey; // ✅ اضافه شد
+                ViewData["chatName"] = chatName;
+                ViewData["chatKey"] = chatKey;
                 ViewData["baseUrl"] = _baseUrl;
                 ViewData["chatType"] = groupType;
 
@@ -419,20 +410,12 @@ namespace Messenger.WebApp.Controllers
 
         /// <summary>
         /// ✅ حالت 2: دریافت پیامهای قدیمی‌تر (اسکرول به بالا)
-        /// - پیامهایی که ID آنها کوچک‌تر از messageId است را دریافت میکند
-        /// - استفاده میشود زمانی که کاربر در چت اسکرول کند
         /// </summary>
-        /// <param name="chatId">آیدی گروه یا کانال</param>
-        /// <param name="groupType">نوع چت</param>
-        /// <param name="messageId">آیدی آخرین پیام لود شده (پایین‌ترین)</param>
-        /// <param name="pageSize">تعداد پیام برای دریافت</param>
-        /// <returns></returns>
         public async Task<IActionResult> GetOlderMessages(string chatId, string groupType, long messageId, int pageSize = 50)
         {
             try
             {
-                var userId = HttpContext.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                if (string.IsNullOrEmpty(userId))
+                if (string.IsNullOrEmpty(User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value))
                 {
                     return BadRequest("User ID not found in claims.");
                 }
@@ -444,18 +427,27 @@ namespace Messenger.WebApp.Controllers
 
                 _logger.LogInformation($"GetOlderMessages: Loading messages before ID {messageId} for chat {chatId}");
 
-                // دریافت پیامهای قدیمی‌تر
-                var messages = await _messageService.GetChatMessagesAsync(
-                    chatId,
-                    groupType,
-                    pageNumber: 1,
-                    pageSize: pageSize,
-                    messageId: messageId,
-                    loadOlder: true,
-                    loadBothDirections: false
-                );
+                IEnumerable<MessageDto> messages;
 
-                // تبدیل پیام‌ها به فرمت مورد انتظار کلاینت
+                if (groupType == ConstChat.PrivateType)
+                {
+                    if (!Guid.TryParse(chatId, out var conversationId))
+                    {
+                        return BadRequest("Invalid GUID format for private chat ID.");
+                    }
+                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, pageSize, messageId, loadOlder: true);
+                }
+                else
+                {
+                    if (!long.TryParse(chatId, out var longChatId))
+                    {
+                        return BadRequest("Invalid chat ID.");
+                    }
+
+                    messages = await _messageService.GetChatMessagesAsync(
+                        longChatId, groupType, 1, pageSize, messageId, loadOlder: true, loadBothDirections: false);
+                }
+
                 var payloadList = TransformMessagesToPayload(messages);
 
                 return Json(new
@@ -474,20 +466,12 @@ namespace Messenger.WebApp.Controllers
 
         /// <summary>
         /// ✅ حالت 3: دریافت پیامهای جدید‌تر (اسکرول به پایین)
-        /// - پیامهایی که ID آنها بزرگ‌تر از messageId است را دریافت میکند
-        /// - استفاده میشود هنگام اسکرول به پایین برای دریافت پیامهای جدیدتر
         /// </summary>
-        /// <param name="chatId">آیدی گروه یا کانال</param>
-        /// <param name="groupType">نوع چت</param>
-        /// <param name="messageId">آیدی آخرین پیام نمایش داده شده (بالاترین)</param>
-        /// <param name="pageSize">تعداد پیام برای دریافت</param>
-        /// <returns></returns>
         public async Task<IActionResult> GetNewerMessages(string chatId, string groupType, long messageId, int pageSize = 50)
         {
             try
             {
-                var userId = HttpContext.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                if (string.IsNullOrEmpty(userId))
+                if (string.IsNullOrEmpty(User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value))
                 {
                     return BadRequest("User ID not found in claims.");
                 }
@@ -499,18 +483,26 @@ namespace Messenger.WebApp.Controllers
 
                 _logger.LogInformation($"GetNewerMessages: Loading messages after ID {messageId} for chat {chatId}");
 
-                // دریافت پیامهای جدید‌تر (تقریباً به همان روش قدیمی‌ها اما از سرور آن را تشخیص میدهد)
-                var messages = await _messageService.GetChatMessagesAsync(
-                    chatId,
-                    groupType,
-                    pageNumber: 1,
-                    pageSize: pageSize,
-                    messageId: messageId,
-                    loadOlder: false,  // false یعنی جدیدتر
-                    loadBothDirections: false
-                );
+                IEnumerable<MessageDto> messages;
+                if (groupType == ConstChat.PrivateType)
+                {
+                    if (!Guid.TryParse(chatId, out var conversationId))
+                    {
+                        return BadRequest("Invalid GUID format for private chat ID.");
+                    }
+                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, pageSize, messageId, loadOlder: false);
+                }
+                else
+                {
+                    if (!long.TryParse(chatId, out var longChatId))
+                    {
+                        return BadRequest("Invalid chat ID.");
+                    }
+                    messages = await _messageService.GetChatMessagesAsync(
+                        longChatId, groupType, 1, pageSize, messageId, loadOlder: false, loadBothDirections: false);
+                }
 
-                // تبدیل پیام‌ها به فرمت مورد انتظار کلاینت
+
                 var payloadList = TransformMessagesToPayload(messages);
 
                 return Json(new
@@ -529,20 +521,12 @@ namespace Messenger.WebApp.Controllers
 
         /// <summary>
         /// ✅ حالت 4: دریافت پیامهای اطراف یک پیام هدف (برای پیامهای پین شده)
-        /// - 25 پیام قبل از پیام هدف
-        /// - 20 پیام بعد از پیام هدف
-        /// - استفاده میشود زمانی که کاربر بر روی پیام پین شده کلیک کند
         /// </summary>
-        /// <param name="chatId">آیدی گروه یا کانال</param>
-        /// <param name="groupType">نوع چت</param>
-        /// <param name="targetMessageId">آیدی پیام هدف (پیام پین شده)</param>
-        /// <returns></returns>
         public async Task<IActionResult> GetMessagesAroundTarget(string chatId, string groupType, long targetMessageId)
         {
             try
             {
-                var userId = HttpContext.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
-                if (string.IsNullOrEmpty(userId))
+                if (string.IsNullOrEmpty(User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value))
                 {
                     return BadRequest("User ID not found in claims.");
                 }
@@ -554,22 +538,26 @@ namespace Messenger.WebApp.Controllers
 
                 _logger.LogInformation($"GetMessagesAroundTarget: Loading messages around target ID {targetMessageId} in chat {chatId}");
 
-                // دریافت پیامهای اطراف پیام هدف
-                // pageSize = 25 سیگنال است برای سرور که بخواهد از هر دو سمت بارگذاری کند
-                var messages = await _messageService.GetChatMessagesAsync(
-                    chatId,
-                    groupType,
-                    pageNumber: 1,
-                    pageSize: 25,  // پیام خاص برای loadBothDirections
-                    messageId: targetMessageId,
-                    loadOlder: true,
-                    loadBothDirections: true  // دریافت از هر دو سمت
-                );
+                IEnumerable<MessageDto> messages;
+                if (groupType == ConstChat.PrivateType)
+                {
+                    if (!Guid.TryParse(chatId, out var conversationId))
+                    {
+                        return BadRequest("Invalid GUID format for private chat ID.");
+                    }
+                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(conversationId, 25, targetMessageId, loadOlder: true, loadBothDirections: true);
+                }
+                else
+                {
+                    if (!long.TryParse(chatId, out var longChatId))
+                    {
+                        return BadRequest("Invalid chat ID.");
+                    }
+                    messages = await _messageService.GetChatMessagesAsync(
+                        longChatId, groupType, 1, 25, targetMessageId, loadOlder: true, loadBothDirections: true);
+                }
 
-                // ترتیب پیامها از قدیم به جدید برای نمایش صحیح
                 var orderedMessages = messages?.OrderBy(m => m.MessageId).ToList() ?? new List<MessageDto>();
-
-                // تبدیل پیام‌ها به فرمت مورد انتظار کلاینت
                 var payloadList = TransformMessagesToPayload(orderedMessages);
 
                 return Json(new

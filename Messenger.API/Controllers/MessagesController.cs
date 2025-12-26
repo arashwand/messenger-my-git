@@ -168,11 +168,20 @@ namespace Messenger.API.Controllers
         }
 
         [HttpGet("private/{otherUserId}")]
-        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateMessages(long otherUserId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
+        public async Task<ActionResult<PrivateChatDto>> GetPrivateMessages(long otherUserId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
         {
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();
-            var messages = await _messageService.GetPrivateMessagesAsync(userId, otherUserId, pageNumber, pageSize);
+            var privateChatDto = await _messageService.GetPrivateMessagesAsync(userId, otherUserId, pageSize, messageId, loadOlder, loadBothDirections);
+            return Ok(privateChatDto);
+        }
+
+        [HttpGet("private/conversation/{conversationId}")]
+        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateMessagesByConversationId(Guid conversationId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
+        {
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+            var messages = await _messageService.GetPrivateChatMessagesAsync(conversationId, userId, pageSize, messageId, loadOlder, loadBothDirections);
             return Ok(messages);
         }
 

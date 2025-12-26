@@ -18,10 +18,13 @@ namespace Messenger.WebApp.ServiceHelper.Interfaces
 
 
         Task<MessageDto?> GetMessageByIdAsync(long messageId);
-        Task<IEnumerable<MessageDto>> GetPrivateMessagesAsync(long userId1, long userId2, int pageNumber, int pageSize, long messageId, bool loadOlder);
+        Task<PrivateChatDto> GetPrivateMessagesAsync(long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false);
         Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, int pageNumber, int pageSize, long messageId, bool loadOlder = false);
         Task<IEnumerable<MessageDto>> GetChatMessagesAsync(long chatId,
         string chatType, int pageNumber, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false);
+
+        Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(Guid conversationId, int pageSize,
+            long messageId = 0, bool loadOlder = false, bool loadBothDirections = false);
 
         Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(long classId, string chatType, int pageSize);
         Task<long?> MarkMessageAsReadAsync(long messageId, long userId);
