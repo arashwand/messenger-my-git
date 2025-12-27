@@ -106,13 +106,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public Task ConnectAsync()
-        {
-            // This is required to satisfy the IRealtimeHubBridgeService interface.
-            // The actual connection logic is in ConnectWithRetryAsync and ConnectAsync(string token).
-            return Task.CompletedTask;
-        }
-
+        
         public async Task ConnectAsync(string token)
         {
             if (IsConnected) return;
@@ -164,7 +158,7 @@ namespace Messenger.WebApp.ServiceHelper
         }
 
 
-        public Task<List<object>> GetUsersWithStatusAsync(string groupId, string groupType)
+        public Task<List<object>> GetUsersWithStatusAsync(long groupId, string groupType)
             => InvokeHubMethodWithResultAsync<List<object>>("GetUsersWithStatus", groupId, groupType);
 
         // جهت انلاین نمودن کاربر
