@@ -6,7 +6,7 @@ namespace Messenger.API.ServiceHelper
     public class MessageProcessingException : Exception
     {
         public long? UserId { get; }
-        public int? GroupId { get; }
+        public string? GroupId { get; }
         public string? GroupType { get; }
 
         public MessageProcessingException(string message) : base(message)

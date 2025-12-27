@@ -78,6 +78,7 @@ namespace Messenger.API.ServiceHelper
                         queuedMessage.UserId, 
                         queuedMessage.GroupId, 
                         queuedMessage.GroupType);
+
                 }
 
                 // تنظیم ClientMessageId در صورت وجود
