@@ -222,5 +222,21 @@ namespace Messenger.WebApp.ServiceHelper
                 await _apiHubConnection.InvokeAsync("RequestUnreadCounts", userId);
         }
 
+        public async Task AnnounceUserPresenceAsync(long userId, string connectionId)
+        {
+            if (IsConnected)
+            {
+                await _apiHubConnection.InvokeAsync("AnnounceUserPresence", userId, connectionId);
+            }
+        }
+
+        public async Task<Dictionary<long, bool>> GetUsersWithStatusAsync(long[] userIds)
+        {
+            if (IsConnected)
+            {
+                return await _apiHubConnection.InvokeAsync<Dictionary<long, bool>>("GetUsersWithStatus", userIds);
+            }
+            return userIds.ToDictionary(id => id, id => false); // Return all as offline if not connected
+        }
     }
 }
