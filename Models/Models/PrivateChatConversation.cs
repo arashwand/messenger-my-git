@@ -8,7 +8,7 @@ namespace Messenger.Models.Models
         [Key]
         public long Id { get; set; }
 
-        public Guid ConversationId { get; set; }
+        public long ConversationId { get; set; }
 
         public long User1Id { get; set; }
 

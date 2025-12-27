@@ -4,6 +4,7 @@ using Messenger.Models.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DatabaseMigrationTool.Migrations
 {
     [DbContext(typeof(IEMessengerDbContext))]
-    partial class MyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251227085953_change-guid-privateConversationChat-to-long-random")]
+    partial class changeguidprivateConversationChattolongrandom
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

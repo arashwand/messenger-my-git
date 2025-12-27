@@ -1,4 +1,4 @@
-﻿using Azure.Core;
+using Azure.Core;
 using Messenger.DTOs;
 using Messenger.Models.Models;
 using Messenger.Tools;
@@ -106,6 +106,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
+        
         public async Task ConnectAsync(string token)
         {
             if (IsConnected) return;
@@ -157,7 +158,7 @@ namespace Messenger.WebApp.ServiceHelper
         }
 
 
-        public Task<List<object>> GetUsersWithStatusAsync(string groupId, string groupType)
+        public Task<List<object>> GetUsersWithStatusAsync(long groupId, string groupType)
             => InvokeHubMethodWithResultAsync<List<object>>("GetUsersWithStatus", groupId, groupType);
 
         // جهت انلاین نمودن کاربر

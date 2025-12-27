@@ -1,12 +1,8 @@
-
-using System;
-using System.Collections.Generic;
-
 namespace Messenger.DTOs
 {
     public class PrivateChatDto
     {
-        public Guid ConversationId { get; set; }
+        public long ConversationId { get; set; }
         public IEnumerable<MessageDto> Messages { get; set; }
     }
 }
