@@ -1,4 +1,4 @@
-﻿using Messenger.DTOs;
+using Messenger.DTOs;
 using Messenger.Models.Models;
 using Messenger.Services.Classes;
 using Messenger.Services.Interfaces;
@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 
@@ -59,13 +60,13 @@ namespace Messenger.Services.Services
         public async Task<MessageDto> SendPrivateMessageAsync(long senderUserId, string conversationId, string messageText,
             List<long>? fileIds = null, long? replyToMessageId = null, bool isPortalMessage = false)
         {
-            if (!Guid.TryParse(conversationId, out var convIdGuid))
+            if (!long.TryParse(conversationId, out var convIdLong))
             {
-                throw new ArgumentException("Invalid GUID format for conversationId.", nameof(conversationId));
+                throw new ArgumentException("Invalid long format for conversationId.", nameof(conversationId));
             }
 
             var conversation = await _context.PrivateChatConversations
-                .FirstOrDefaultAsync(c => c.ConversationId == convIdGuid);
+                .FirstOrDefaultAsync(c => c.PublicId == convIdLong);
 
             if (conversation == null)
             {
@@ -668,6 +669,7 @@ namespace Messenger.Services.Services
                 conversation = new PrivateChatConversation
                 {
                     ConversationId = Guid.NewGuid(),
+                    PublicId = GenerateSecureRandomLong(),
                     User1Id = currentUserId,
                     User2Id = otherUserId
                 };
@@ -681,6 +683,7 @@ namespace Messenger.Services.Services
             return new PrivateChatDto
             {
                 ConversationId = conversation.ConversationId,
+                PublicId = conversation.PublicId,
                 Messages = messages
             };
         }
@@ -797,14 +800,14 @@ namespace Messenger.Services.Services
             return await GetChatMessagesInternal(chatId, chatType, currentUserId, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
         }
 
-        public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(Guid conversationId, long currentUserId, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false)
+        public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false)
         {
             var conversation = await _context.PrivateChatConversations
-                .FirstOrDefaultAsync(c => c.ConversationId == conversationId);
+                .FirstOrDefaultAsync(c => c.PublicId == conversationId);
 
             if (conversation == null)
             {
-                _logger.LogWarning($"Conversation not found for GUID: {conversationId}");
+                _logger.LogWarning($"Conversation not found for ID: {conversationId}");
                 return new List<MessageDto>();
             }
 
@@ -2010,10 +2013,10 @@ namespace Messenger.Services.Services
 
             if (groupType == ConstChat.PrivateType)
             {
-                if (!Guid.TryParse(targetId, out var convIdGuid))
-                    throw new ArgumentException("Invalid GUID format for conversationId.", nameof(targetId));
+                if (!long.TryParse(targetId, out numericTargetId))
+                    throw new ArgumentException("Invalid long format for conversationId.", nameof(targetId));
 
-                var conversation = await _context.PrivateChatConversations.FirstOrDefaultAsync(c => c.ConversationId == convIdGuid);
+                var conversation = await _context.PrivateChatConversations.FirstOrDefaultAsync(c => c.PublicId == numericTargetId);
                 if (conversation == null)
                     throw new KeyNotFoundException("Private chat session not found.");
 
@@ -2464,6 +2467,7 @@ namespace Messenger.Services.Services
                         conversation = new PrivateChatConversation
                         {
                             ConversationId = Guid.NewGuid(),
+                            PublicId = GenerateSecureRandomLong(),
                             User1Id = userId,
                             User2Id = chat.OtherUserId
                         };
@@ -2474,8 +2478,8 @@ namespace Messenger.Services.Services
                     privateChats.Add(new PrivateChatItemDto
                     {
                         ConversationId = conversation.ConversationId,
-                        ChatId = chat.OtherUserId,
-                        ChatKey = conversation.ConversationId.ToString(),
+                        ChatId = conversation.PublicId,
+                        ChatKey = conversation.PublicId.ToString(),
                         ChatName = otherUser.NameFamily,
                         ProfilePicName = otherUser.ProfilePicName,
                         LastMessage = new ChatMessageDto
@@ -2587,19 +2591,19 @@ namespace Messenger.Services.Services
 
         public async Task<long> GetOtherUserIdInPrivateChat(string conversationId, long currentUserId)
         {
-            if (!Guid.TryParse(conversationId, out var convIdGuid))
+            if (!long.TryParse(conversationId, out var convIdLong))
             {
-                _logger.LogWarning("Invalid GUID format passed to GetOtherUserIdInPrivateChat: {ConversationId}", conversationId);
+                _logger.LogWarning("Invalid long format passed to GetOtherUserIdInPrivateChat: {ConversationId}", conversationId);
                 return 0;
             }
 
             var conversation = await _context.PrivateChatConversations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.ConversationId == convIdGuid);
+                .FirstOrDefaultAsync(c => c.PublicId == convIdLong);
 
             if (conversation == null)
             {
-                _logger.LogWarning("No conversation found for GUID: {ConversationId}", conversationId);
+                _logger.LogWarning("No conversation found for ID: {ConversationId}", conversationId);
                 return 0;
             }
 
@@ -2612,6 +2616,17 @@ namespace Messenger.Services.Services
             _logger.LogWarning("User {CurrentUserId} is not a participant in conversation {ConversationId}", currentUserId, conversationId);
             return 0; // User is not part of this conversation
         }
+
+        private long GenerateSecureRandomLong()
+        {
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                byte[] bytes = new byte[8];
+                rng.GetBytes(bytes);
+                long random = BitConverter.ToInt64(bytes, 0);
+                // Ensure the number is positive and fits within a safe range for JavaScript
+                return Math.Abs(random % 9007199254740991L);
+            }
+        }
     }
 }
-
