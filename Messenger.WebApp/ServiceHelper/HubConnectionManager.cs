@@ -1,4 +1,4 @@
-﻿using Azure.Core;
+using Azure.Core;
 using Messenger.DTOs;
 using Messenger.Models.Models;
 using Messenger.Tools;
@@ -104,6 +104,13 @@ namespace Messenger.WebApp.ServiceHelper
             {
                 _connectionLock.Release();
             }
+        }
+
+        public Task ConnectAsync()
+        {
+            // This is required to satisfy the IRealtimeHubBridgeService interface.
+            // The actual connection logic is in ConnectWithRetryAsync and ConnectAsync(string token).
+            return Task.CompletedTask;
         }
 
         public async Task ConnectAsync(string token)

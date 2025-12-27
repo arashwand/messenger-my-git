@@ -66,7 +66,7 @@ namespace Messenger.Services.Services
             }
 
             var conversation = await _context.PrivateChatConversations
-                .FirstOrDefaultAsync(c => c.PublicId == convIdLong);
+                .FirstOrDefaultAsync(c => c.ConversationId == convIdLong);
 
             if (conversation == null)
             {
@@ -668,8 +668,7 @@ namespace Messenger.Services.Services
             {
                 conversation = new PrivateChatConversation
                 {
-                    ConversationId = Guid.NewGuid(),
-                    PublicId = GenerateSecureRandomLong(),
+                    ConversationId = GenerateSecureRandomLong(),
                     User1Id = currentUserId,
                     User2Id = otherUserId
                 };
@@ -683,7 +682,6 @@ namespace Messenger.Services.Services
             return new PrivateChatDto
             {
                 ConversationId = conversation.ConversationId,
-                PublicId = conversation.PublicId,
                 Messages = messages
             };
         }
@@ -794,8 +792,7 @@ namespace Messenger.Services.Services
             // This method is now only for group and channel chats
             if (chatType == ConstChat.PrivateType)
             {
-                _logger.LogWarning("GetChatMessages called with Private chat type. Use GetPrivateChatMessagesAsync instead.");
-                return new List<MessageDto>();
+                return await GetPrivateChatMessagesAsync(chatId, currentUserId, pageSize, messageId, loadOlder, loadBothDirections);
             }
             return await GetChatMessagesInternal(chatId, chatType, currentUserId, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
         }
@@ -803,7 +800,7 @@ namespace Messenger.Services.Services
         public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false)
         {
             var conversation = await _context.PrivateChatConversations
-                .FirstOrDefaultAsync(c => c.PublicId == conversationId);
+                .FirstOrDefaultAsync(c => c.ConversationId == conversationId);
 
             if (conversation == null)
             {
@@ -2016,7 +2013,7 @@ namespace Messenger.Services.Services
                 if (!long.TryParse(targetId, out numericTargetId))
                     throw new ArgumentException("Invalid long format for conversationId.", nameof(targetId));
 
-                var conversation = await _context.PrivateChatConversations.FirstOrDefaultAsync(c => c.PublicId == numericTargetId);
+                var conversation = await _context.PrivateChatConversations.FirstOrDefaultAsync(c => c.ConversationId == numericTargetId);
                 if (conversation == null)
                     throw new KeyNotFoundException("Private chat session not found.");
 
@@ -2466,8 +2463,7 @@ namespace Messenger.Services.Services
                     {
                         conversation = new PrivateChatConversation
                         {
-                            ConversationId = Guid.NewGuid(),
-                            PublicId = GenerateSecureRandomLong(),
+                            ConversationId = GenerateSecureRandomLong(),
                             User1Id = userId,
                             User2Id = chat.OtherUserId
                         };
@@ -2477,9 +2473,8 @@ namespace Messenger.Services.Services
 
                     privateChats.Add(new PrivateChatItemDto
                     {
-                        ConversationId = conversation.ConversationId,
-                        ChatId = conversation.PublicId,
-                        ChatKey = conversation.PublicId.ToString(),
+                        ChatId = conversation.ConversationId,
+                        ChatKey = conversation.ConversationId.ToString(),
                         ChatName = otherUser.NameFamily,
                         ProfilePicName = otherUser.ProfilePicName,
                         LastMessage = new ChatMessageDto
@@ -2599,7 +2594,7 @@ namespace Messenger.Services.Services
 
             var conversation = await _context.PrivateChatConversations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.PublicId == convIdLong);
+                .FirstOrDefaultAsync(c => c.ConversationId == convIdLong);
 
             if (conversation == null)
             {
