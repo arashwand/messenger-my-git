@@ -13,7 +13,7 @@ namespace Messenger.DTOs
         /// <summary>
         /// شناسه گروه یا کانال
         /// </summary>
-        public int GroupId { get; set; }
+        public string GroupId { get; set; }
 
         /// <summary>
         /// نوع گروه (ClassGroup یا ChannelGroup)

@@ -62,12 +62,12 @@ namespace Messenger.API.ServiceHelper
 
                 // 1. ذخیره پیام در دیتابیس
                 var savedMessageDto = await _messageService.SendGroupMessageAsync(
-                    queuedMessage.UserId,
-                    queuedMessage.GroupId,
-                    queuedMessage.GroupType,
-                    queuedMessage.MessageText,
-                    queuedMessage.FileAttachementIds,
-                    queuedMessage.ReplyToMessageId);
+                    senderUserId: queuedMessage.UserId,
+                    classId: queuedMessage.GroupId,
+                    groupType: queuedMessage.GroupType,
+                    messageText: queuedMessage.MessageText,
+                    files: queuedMessage.FileAttachementIds,
+                    replyToMessageId: queuedMessage.ReplyToMessageId);
 
                 if (savedMessageDto == null)
                 {
@@ -78,6 +78,7 @@ namespace Messenger.API.ServiceHelper
                         queuedMessage.UserId, 
                         queuedMessage.GroupId, 
                         queuedMessage.GroupType);
+
                 }
 
                 // تنظیم ClientMessageId در صورت وجود
@@ -89,7 +90,21 @@ namespace Messenger.API.ServiceHelper
                 _logger.LogInformation("Message saved with MessageId: {MessageId}", savedMessageDto.MessageId);
 
                 // 2. ارسال پیام از طریق SignalR
-                var groupKey = GenerateSignalRGroupKey.GenerateKey(queuedMessage.GroupId, queuedMessage.GroupType);
+                string groupKey;
+                if (queuedMessage.GroupType == ConstChat.PrivateType)
+                {
+                    long receiverId = savedMessageDto.GroupId;
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(queuedMessage.UserId, receiverId);
+                }
+                else
+                {
+                    if (!long.TryParse(queuedMessage.GroupId, out var numericGroupId))
+                    {
+                        _logger.LogError("Invalid GroupId format in queued message: {GroupId}", queuedMessage.GroupId);
+                        return;
+                    }
+                    groupKey = GenerateSignalRGroupKey.GenerateKey(numericGroupId, queuedMessage.GroupType);
+                }
 
                 await _hubContext.Clients.Group(groupKey).SendAsync("ReceiveMessage", savedMessageDto);
                 _logger.LogInformation("Message broadcasted to SignalR group {GroupKey}", groupKey);

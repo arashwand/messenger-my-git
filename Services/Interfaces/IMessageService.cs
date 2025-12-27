@@ -25,7 +25,7 @@ namespace Messenger.Services.Interfaces
         /// <param name="files"></param>
         /// <param name="replyToMessageId"></param>
         /// <returns></returns>
-        Task<MessageDto> SendGroupMessageAsync(long senderUserId, long classId, string groupType,
+        Task<MessageDto> SendGroupMessageAsync(long senderUserId, string classId, string groupType,
             string messageText, List<long>? files = null, long? replyToMessageId = null, bool isPin = false, bool isPortalMessage = false);
 
         /// <summary>
@@ -75,10 +75,10 @@ namespace Messenger.Services.Interfaces
 
 
         // Edit
-        Task<MessageDto> EditMessageAsync(long messageId, long editorUserId, long groupId, string groupType, string? newMessageText = null,
+        Task<MessageDto> EditMessageAsync(long messageId, long editorUserId, string groupId, string groupType, string? newMessageText = null,
             List<long>? fileIds = null, List<long>? fileIdsToRemove = null);
 
-        Task<MessageDto> EditChannelMessageAsync(long messageId, long editorUserId, long groupId, string? newMessageText = null,
+        Task<MessageDto> EditChannelMessageAsync(long messageId, long editorUserId, string groupId, string? newMessageText = null,
             List<long>? fileIds = null, List<long>? fileIdsToRemove = null);
 
         Task<MessageDto> EditPrivateMessageAsync(long senderUserId, long messageId, long receiverUserId, string messageText,
@@ -97,6 +97,7 @@ namespace Messenger.Services.Interfaces
 
         // Private Chats & System Messages
         Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
+        Task<long> GetOtherUserIdInPrivateChat(string conversationId, long currentUserId);
     }
 }
 
