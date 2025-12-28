@@ -67,7 +67,6 @@ namespace Messenger.API.ServiceHelper
                 .ToListAsync();
         }
 
-
         /// <summary>
         /// ارسال به همه
         /// در اینجا تصمیم گیری میشه چطور و به کجا ارسال انجام بشه
@@ -307,179 +306,6 @@ namespace Messenger.API.ServiceHelper
             }
         }
 
-
-        /// <summary>
-        /// ارسال به همه
-        /// در اینجا تصمیم گیری میشه چطور و به کجا ارسال انجام بشه
-        /// </summary>
-        /// <param name="request">درخواست ارسال پیام به همه</param>
-        /// <param name="senderUserId">ایدی ارسال کننده</param>
-        /// <returns>نتیجه عملیات شامل تعداد دریافت‌کنندگان و پیام وضعیت</returns>
-        /// <exception cref="ArgumentNullException">اگر درخواست خالی باشد</exception>
-        /// <exception cref="ArgumentException">اگر نوع پیام نامعتبر باشد</exception>
-        /// <exception cref="InvalidOperationException">اگر خطایی در ذخیره یا ارسال پیام رخ دهد</exception>
-        public async Task<BroadcastResultDto> BroadcasPrivateMessagetAsync(long senderUserId, SendPrivateMessageToAllFromPortalDto request)
-        {
-            // گام 1: اعتبارسنجی ورودی
-            // اگر درخواستی ارسال نشده یا متن پیام خالی باشد، با خطا خروجی می‌دهیم
-            if (request == null)
-            {
-                _logger.LogError("BroadcastAsync received null request");
-                throw new ArgumentNullException(nameof(request), "Broadcast request cannot be null");
-            }
-
-            if (string.IsNullOrWhiteSpace(request.MessageText))
-            {
-                _logger.LogError("BroadcastAsync received empty message text");
-                throw new ArgumentException("Message text cannot be empty", nameof(request));
-            }
-
-            try
-            {
-                // گام 2: ذخیره پیام در دیتابیس از طریق سرویس پیام‌ها
-                // (SendMessageToAllAsync مسئول ساخت رکورد پیام کلی و برگرداندن DTO مربوطه است)
-                var savedMessageDto = await _messageService.SendMessageToAllAsync(
-                    userId: 100, //TODO  این ایدی باید در دیتابیس از قبل وجود داشته باشد
-                    messageType: request.MessageType, //Private 
-                    messageText: request.MessageText,
-                    isPin: false,
-                    isPortalMessage: true);
-
-                // اگر ذخیره موفق نباشد؛ عملیات متوقف و خطا پرتاب می‌شود
-                if (savedMessageDto == null)
-                {
-                    _logger.LogError("Failed to save message in SendMessageToAllAsync");
-                    throw new InvalidOperationException("Failed to save broadcast message");
-                }
-
-                int targetIdsCount = 0;
-
-                // شاخه مربوط به ارسال به کاربران بر اساس نقش
-                try
-                {
-                    // 4.a -  لیست کاربران هدف
-                    var peopleTargetIds = request.UserIds;
-                    targetIdsCount = peopleTargetIds.Count;
-
-                    if (targetIdsCount == 0)
-                    {
-                        _logger.LogWarning("No recipients found for message type {MessageType}", request.MessageType);
-                        return new BroadcastResultDto
-                        {
-                            MessageText = $"No recipients found for {request.MessageType}",
-                            TargetIdsCount = 0
-                        };
-                    }
-
-                    //به ازای هر گیرنده ابتدا باید برسی بشه که ایدی اختصاصی چت بین ایشون و سیستم وجود داره یا خیر
-                    // اگه نداره باید ساخته بشه
-                    // سپس به ازای هر ایدی چتی که ایجاد شد و ایدی پیام، یک رکورد در جدول گیرندگان ایجاد میشه 
-
-                    foreach (var item in request.UserIds)
-                    {
-                        //ایجاد یا بدست اوردن ایدی چت
-                        var conversation = await _context.PrivateChatConversations
-                         .FirstOrDefaultAsync(c => (c.User1Id == savedMessageDto.SenderUserId && c.User2Id == item) ||
-                            (c.User1Id == item && c.User2Id == savedMessageDto.SenderUserId));
-
-                        if (conversation == null)
-                        {
-                            conversation = new PrivateChatConversation
-                            {
-                                ConversationId = GenerateSecureRandomLong.Generate(),
-                                User1Id = savedMessageDto.SenderUserId,
-                                User2Id = item
-                            };
-                            _context.PrivateChatConversations.Add(conversation);
-                            await _context.SaveChangesAsync();
-                        }
-
-                        long conversationId = conversation.ConversationId;
-
-
-                        List<MessageRecipient> recipients = new List<MessageRecipient>();
-                        //درج در جدول گیرندگان پیام
-                        try
-                        {
-                            var recipient = new MessageRecipient
-                            {
-                                MessageId = savedMessageDto.MessageId,
-                                UserConversationId = conversationId,
-                                
-                            };
-                            recipients.Add(recipient);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw;
-                        }
-
-                        _context.MessageRecipients.AddRange(recipients);
-                        await _context.SaveChangesAsync();
-                    }
-
-
-
-                    // 4.b - ارسال پیام به شناسه‌های کاربران مشخص شده از طریق SignalR Users
-                    var userIdentifiers = peopleTargetIds.Select(id => id.ToString());
-
-                    await _hubContext.BroadcastToUsersAndBridgeAsync(_logger, BridgeGroupName, userIdentifiers, "BroadcastToUsers",
-                        new object[] { savedMessageDto, request.MessageType, peopleTargetIds });
-
-                    _logger.LogInformation("Successfully sent broadcast message to {Count} recipients of type {MessageType}",
-                        targetIdsCount,
-                        request.MessageType);
-
-                    // 4.c - افزایش شمارنده unread برای هر کاربر (در این حالت targetId و groupType خاصی نداریم)
-                    var tasks = new List<Task>();
-                    foreach (var userId in peopleTargetIds)
-                    {
-                        tasks.Add(_redisUnreadManage.IncrementUnreadCountAsync(userId, 0, string.Empty));
-                        // ارسال UpdateUnreadCount
-                        tasks.Add(_redisUnreadManage.GetUnreadCountAsync(userId, 0, string.Empty).ContinueWith(async tResult =>
-                        {
-                            if (tResult.IsFaulted)
-                            {
-                                _logger.LogError(tResult.Exception, "Error retrieving unread count for user {UserId}", userId);
-                                return;
-                            }
-
-                            var unreadCount = tResult.Result;
-                            await _hubContext.Clients.User(userId.ToString()).SendAsync("UpdateUnreadCount", userId, "", unreadCount);
-                            await _hubContext.Clients.Group(BridgeGroupName).SendAsync("UpdateUnreadCount", userId, "", unreadCount);
-                        }).Unwrap());
-                    }
-                    await Task.WhenAll(tasks);
-                }
-                catch (ArgumentException ex)
-                {
-                    // خطاهای مرتبط با نوع پیام را لاگ و دوباره پراکنده می‌کنیم
-                    _logger.LogError(ex, "Invalid message type while sending message: {MessageType}", request.MessageType);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    // سایر خطاها را لاگ و به صورت InvalidOperationException بالا می‌بریم
-                    _logger.LogError(ex, "Error broadcasting to {MessageType}: {Error}", request.MessageType, ex.Message);
-                    throw new InvalidOperationException($"Failed to broadcast message to {request.MessageType}", ex);
-                }
-
-                // گام نهایی: بازگشت نتیجه موفق شامل تعداد گیرندگان
-                return new BroadcastResultDto
-                {
-                    MessageText = $"Successfully sent message to {targetIdsCount} recipients",
-                    TargetIdsCount = targetIdsCount
-                };
-            }
-            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
-            {
-                // لاگ برای خطاهای غیرمنتظره و تبدیل به InvalidOperationException عمومی
-                _logger.LogError(ex, "Unexpected error in BroadcastAsync: {Error}", ex.Message);
-                throw new InvalidOperationException("An unexpected error occurred while broadcasting message", ex);
-            }
-        }
-
-
         /// <summary>
         /// ارسال پیام به یک هدف خاص: فرد، گروه یا کانال
         /// این متد پیام را ذخیره کرده و از طریق SignalR ارسال می‌کند
@@ -533,7 +359,7 @@ namespace Messenger.API.ServiceHelper
                     var groupType = request.TargetType == ConstChat.ClassGroupType ? ConstChat.ClassGroupType : ConstChat.ChannelGroupType;
                     savedMessageDto = await _messageService.SendGroupMessageAsync(
                         senderUserId: senderUserId,
-                        classId: request.TargetId,
+                        classId: request.TargetId.ToString(),
                         groupType: groupType,
                         messageText: request.MessageText,
                         files: request.FileIds,
