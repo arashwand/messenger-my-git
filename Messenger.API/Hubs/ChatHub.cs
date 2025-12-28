@@ -409,7 +409,7 @@ namespace Messenger.API.Hubs
         }
 
         // =================== Helpers / Queries ===================
-        public async Task<List<object>> GetUsersWithStatus(string groupId, string groupType)
+        public async Task<List<object>> GetUsersWithStatus(long groupId, string groupType)
         {
             var groupKey = (groupType == ConstChat.ClassGroupType ? ConstChat.ClassGroup : ConstChat.ChannelGroup) + groupId;
             var onlineUserIds = await _userStatusService.GetOnlineUsersAsync(groupKey);
@@ -417,9 +417,9 @@ namespace Messenger.API.Hubs
 
             IEnumerable<UserDto> allUsers;
             if (groupType == ConstChat.ClassGroupType)
-                allUsers = await _classGroupService.GetClassGroupMembersInternalAsync(long.Parse(groupId));
+                allUsers = await _classGroupService.GetClassGroupMembersInternalAsync(groupId);
             else
-                allUsers = await _channelService.GetChannelMembersInternalAsync(long.Parse(groupId));
+                allUsers = await _channelService.GetChannelMembersInternalAsync(groupId);
 
             return allUsers.Select(u => new { UserId = u.UserId, UserName = u.NameFamily, ProfilePic = u.ProfilePicName, IsOnline = onlineSet.Contains(u.UserId) }).Cast<object>().ToList();
         }
