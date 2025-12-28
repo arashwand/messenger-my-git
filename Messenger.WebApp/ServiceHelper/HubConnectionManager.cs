@@ -172,10 +172,10 @@ namespace Messenger.WebApp.ServiceHelper
                     => InvokeHubMethodAsync("SendHeartbeat", userId);
 
         public Task SendTypingSignalAsync(long userId, long groupId, string groupType)
-            => InvokeHubMethodAsync("Typing", userId, groupId, groupType);
+            => InvokeHubMethodAsync("Typing", userId, groupId.ToString(), groupType);
 
         public Task SendStopTypingSignalAsync(long userId, long groupId, string groupType)
-            => InvokeHubMethodAsync("StopTyping", userId, groupId, groupType);
+            => InvokeHubMethodAsync("StopTyping", userId, groupId.ToString(), groupType);
 
         public Task MarkMessageAsReadAsync(long userId, long groupId, string groupType, long messageId)
             => InvokeHubMethodAsync("MarkMessageAsRead", userId, groupId, groupType, messageId);
@@ -441,7 +441,7 @@ namespace Messenger.WebApp.ServiceHelper
                     {
                         var userId = GetInt64FromPayload(payload[0]);
                         var userName = GetStringFromPayload(payload[1]) ?? "-";
-                        var groupId = GetInt32FromPayload(payload[2]);
+                        var groupId = GetInt64FromPayload(payload[2]);
 
                         _logger.LogInformation("UserTyping event received: userId={UserId}, userName={UserName}, groupId={GroupId}", userId, userName, groupId);
                         await _webAppHubContext.Clients.All.SendAsync("UserTyping", userId, userName, groupId);
@@ -465,7 +465,7 @@ namespace Messenger.WebApp.ServiceHelper
                     try
                     {
                         var userId = GetInt64FromPayload(payload[0]);
-                        var groupId = GetInt32FromPayload(payload[1]);
+                        var groupId = GetInt64FromPayload(payload[1]);
 
                         _logger.LogInformation("UserStoppedTyping event received: userId={UserId}, groupId={GroupId}", userId, groupId);
                         await _webAppHubContext.Clients.All.SendAsync("UserStoppedTyping", userId, groupId);

@@ -615,9 +615,6 @@ namespace DatabaseMigrationTool.Migrations
                     b.Property<long>("ConversationId")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<long>("User1Id")
                         .HasColumnType("bigint");
 
