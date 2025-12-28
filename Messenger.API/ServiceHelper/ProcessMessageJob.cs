@@ -93,21 +93,13 @@ namespace Messenger.API.ServiceHelper
                 string groupKey;
                 if (queuedMessage.GroupType == ConstChat.PrivateType)
                 {
-                    if (!long.TryParse(queuedMessage.GroupId, out var conversationId))
-                    {
-                        _logger.LogError("Invalid ConversationId format in queued message: {ConversationId}", queuedMessage.GroupId);
-                        return;
-                    }
-                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
+                    
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(queuedMessage.GroupId);
                 }
                 else
                 {
-                    if (!long.TryParse(queuedMessage.GroupId, out var numericGroupId))
-                    {
-                        _logger.LogError("Invalid GroupId format in queued message: {GroupId}", queuedMessage.GroupId);
-                        return;
-                    }
-                    groupKey = GenerateSignalRGroupKey.GenerateKey(numericGroupId, queuedMessage.GroupType);
+                    
+                    groupKey = GenerateSignalRGroupKey.GenerateKey(queuedMessage.GroupId, queuedMessage.GroupType);
                 }
 
                 await _hubContext.Clients.Group(groupKey).SendAsync("ReceiveMessage", savedMessageDto);

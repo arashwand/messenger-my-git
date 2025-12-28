@@ -126,7 +126,7 @@ namespace Messenger.API.Hubs
                         var privateChatGroupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(chat.ConversationId);
                         await Groups.AddToGroupAsync(Context.ConnectionId, privateChatGroupKey);
                         await _userStatusService.SetUserOnlineAsync(privateChatGroupKey, userId);
-                        
+
                         _logger.LogInformation($"User {userId} joined private chat group: {privateChatGroupKey}");
                     }
                 }
@@ -344,7 +344,7 @@ namespace Messenger.API.Hubs
 
                 if (finalUnreadCount > 0)
                 {
-                    await SendUnreadCountUpdateAsync(userId, targetId.ToString(), groupType, finalUnreadCount, isBridge);
+                    await SendUnreadCountUpdateAsync(userId, targetId, groupType, finalUnreadCount, isBridge);
                 }
             }
             catch (Exception ex)
@@ -373,16 +373,16 @@ namespace Messenger.API.Hubs
             }
         }
 
-        private async Task SendUnreadCountUpdateAsync(long userId, string entityId, string groupType, int unreadCount, bool isBridge)
+        private async Task SendUnreadCountUpdateAsync(long userId, long entityId, string groupType, int unreadCount, bool isBridge)
         {
             string badgeKey;
 
             if (groupType == ConstChat.PrivateType)
             {
-                if (long.TryParse(entityId, out var conversationId))
+                if (entityId > 0)
                 {
-                    badgeKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
-                    _logger.LogInformation($"✅ Generated Private badge key: {badgeKey} for conversationId={conversationId}");
+                    badgeKey = PrivateChatHelper.GeneratePrivateChatGroupKey(entityId);
+                    _logger.LogInformation($"✅ Generated Private badge key: {badgeKey} for conversationId={entityId}");
                 }
                 else
                 {
@@ -392,9 +392,9 @@ namespace Messenger.API.Hubs
             }
             else
             {
-                if (long.TryParse(entityId, out var groupId))
+                if (entityId > 0)
                 {
-                    badgeKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
+                    badgeKey = GenerateSignalRGroupKey.GenerateKey(entityId, groupType);
                     _logger.LogInformation($"✅ Generated Group/Channel badge key: {badgeKey}");
                 }
                 else
@@ -485,7 +485,7 @@ namespace Messenger.API.Hubs
 
                 var jobId = _messageQueueService.EnqueueMessage(queuedMessage);
 
-                _logger.LogInformation("Message queued with JobId: {JobId} from user {UserId} with priority {Priority}", 
+                _logger.LogInformation("Message queued with JobId: {JobId} from user {UserId} with priority {Priority}",
                     jobId, request.UserId, priority);
 
                 // اعلام به کاربر که پیام در صف قرار گرفت
@@ -502,12 +502,12 @@ namespace Messenger.API.Hubs
             }
 
             // ارسال فوری (کد قبلی)
-            long? groupId = null;
+            long groupId = 0;
             if (request.GroupType != ConstChat.PrivateType && request.GroupType != "Private")
             {
-                if (long.TryParse(request.GroupId, out var id))
+                if (request.GroupId > 0)
                 {
-                    groupId = id;
+                    groupId = request.GroupId;
                 }
                 else
                 {
@@ -517,7 +517,7 @@ namespace Messenger.API.Hubs
             }
 
             var savedMessageDto = await _messageService.SendGroupMessageAsync(request.UserId,
-                request.GroupType == ConstChat.PrivateType ? request.GroupId : groupId.ToString(),
+                groupId,
                 request.GroupType, request.MessageText, request.FileAttachementIds, request.ReplyToMessageId);
 
             if (savedMessageDto == null)
@@ -530,32 +530,32 @@ namespace Messenger.API.Hubs
 
             // محاسبه groupKey و تنظیم ChatKey
             string groupKey;
-            
+
             if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
             {
-                if (!long.TryParse(request.GroupId, out var conversationId))
+                if (request.GroupId == 0)
                 {
                     await Clients.Caller.SendAsync("SendMessageError", new { request.ClientMessageId, Error = "Invalid ConversationId format." });
                     return;
                 }
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(request.GroupId);
 
                 // تنظیم ChatKey و GroupType
                 savedMessageDto.ChatKey = groupKey;
                 savedMessageDto.GroupType = "Private";
-                savedMessageDto.GroupId = conversationId;
+                savedMessageDto.GroupId = request.GroupId;
 
-                _logger.LogInformation($"Private message: SenderId={request.UserId}, ConversationId={conversationId}, ChatKey={groupKey}");
+                _logger.LogInformation($"Private message: SenderId={request.UserId}, ConversationId={request.GroupId}, ChatKey={groupKey}");
             }
             else
             {
                 // برای Group/Channel
                 groupKey = GenerateSignalRGroupKey.GenerateKey((long)groupId, request.GroupType);
-                
+
                 savedMessageDto.ChatKey = groupKey;
                 savedMessageDto.GroupType = request.GroupType;
                 savedMessageDto.GroupId = (long)groupId;
-                
+
                 _logger.LogInformation($"Group message: GroupId={groupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
             }
 
@@ -573,7 +573,7 @@ namespace Messenger.API.Hubs
                 await Clients.User(savedMessageDto.SenderUserId.ToString()).SendAsync("MessageSentSuccessfully", savedMessageDto);
 
             var chatMessageDto = new ChatMessageDto { MessageId = savedMessageDto.MessageId, SenderId = savedMessageDto.SenderUserId, SenderName = savedMessageDto.SenderUser?.NameFamily ?? string.Empty, SentAt = savedMessageDto.MessageDateTime, Text = savedMessageDto.MessageText?.MessageTxt };
-            
+
             // ✅ برای Private: استفاده از groupKey (chatKey) به جای OwnerId
             if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
             {
@@ -656,7 +656,7 @@ namespace Messenger.API.Hubs
 
                 if (request.GroupType != ConstChat.PrivateType)
                 {
-                    if (!long.TryParse(request.GroupId, out var groupId))
+                    if (request.GroupId == 0)
                     {
                         // Handle error for non-private chats with invalid group id
                         return (false, MessagePriority.Normal);
@@ -664,30 +664,30 @@ namespace Messenger.API.Hubs
 
                     // فاز 1: بررسی تعداد اعضای گروه (Canary Deployment)
                     var memberCount = request.GroupType == ConstChat.ClassGroupType
-                        ? await _classGroupService.GetClassGroupMembersCountAsync(groupId)
-                        : await _channelService.GetChannelMembersCountAsync(groupId);
+                        ? await _classGroupService.GetClassGroupMembersCountAsync(request.GroupId)
+                        : await _channelService.GetChannelMembersCountAsync(request.GroupId);
 
                     if (memberCount > 50)
                     {
-                    // گروههای بزرگتر از 200 نفر با اولویت بالا
-                    if (memberCount > 200)
+                        // گروههای بزرگتر از 200 نفر با اولویت بالا
+                        if (memberCount > 200)
+                        {
+                            _logger.LogInformation("Queueing message for large group (>{Count} members) with HIGH priority", memberCount);
+                            return (true, MessagePriority.High);
+                        }
+
+                        // گروههای 50-200 نفر با اولویت عادی
+                        _logger.LogInformation("Queueing message for medium group ({Count} members) with NORMAL priority", memberCount);
+                        return (true, MessagePriority.Normal);
+                    }
+
+                    // فاز 2: بررسی پیامهای حجیم (با 3 یا بیشتر فایل پیوست)
+                    if (request.FileAttachementIds != null && request.FileAttachementIds.Count >= 3)
                     {
-                        _logger.LogInformation("Queueing message for large group (>{Count} members) with HIGH priority", memberCount);
+                        _logger.LogInformation("Queueing message with {FileCount} attachments with HIGH priority",
+                            request.FileAttachementIds.Count);
                         return (true, MessagePriority.High);
                     }
-                    
-                    // گروههای 50-200 نفر با اولویت عادی
-                    _logger.LogInformation("Queueing message for medium group ({Count} members) with NORMAL priority", memberCount);
-                    return (true, MessagePriority.Normal);
-                }
-
-                // فاز 2: بررسی پیامهای حجیم (با 3 یا بیشتر فایل پیوست)
-                if (request.FileAttachementIds != null && request.FileAttachementIds.Count >= 3)
-                {
-                    _logger.LogInformation("Queueing message with {FileCount} attachments with HIGH priority",
-                        request.FileAttachementIds.Count);
-                    return (true, MessagePriority.High);
-                }
                 }
                 // فاز 4: آماده برای افزودن در آینده
                 // - Scheduled Messages: پیامهای برنامهریزی شده
@@ -737,7 +737,7 @@ namespace Messenger.API.Hubs
 
                 // محاسبه groupKey و تنظیم ChatKey (مشابه SendMessage)
                 string groupKey;
-                
+
                 if (request.GroupType == ConstChat.PrivateType || request.GroupType == "Private")
                 {
                     if (!long.TryParse(request.GroupId, out var conversationId))
@@ -758,11 +758,11 @@ namespace Messenger.API.Hubs
                 {
                     // برای Group/Channel
                     groupKey = GenerateSignalRGroupKey.GenerateKey((long)groupId, request.GroupType);
-                    
+
                     savedMessageDto.ChatKey = groupKey;
                     savedMessageDto.GroupType = request.GroupType;
                     savedMessageDto.GroupId = (long)groupId;
-                    
+
                     _logger.LogInformation($"Group message edited: GroupId={groupId}, GroupType={request.GroupType}, ChatKey={groupKey}");
                 }
 
@@ -804,22 +804,22 @@ namespace Messenger.API.Hubs
             }
         }
 
-        public async Task Typing(long userId, string groupId, string groupType)
+        public async Task Typing(long userId, long groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
             var fullName = GetCurrentUserFullName();
-            
+
             string groupKey;
             if (groupType == ConstChat.PrivateType)
             {
-                if (!long.TryParse(groupId, out var conversationId)) return;
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
+                //if (!long.TryParse(groupId, out var conversationId)) return;
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(groupId);
             }
             else
             {
-                groupKey = GenerateSignalRGroupKey.GenerateKey(long.Parse(groupId), groupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
             }
-            
+
             _logger.LogInformation("Typing event sent for user {UserId} in group {GroupKey}", userId, groupKey);
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
                 groupKey,
@@ -830,19 +830,19 @@ namespace Messenger.API.Hubs
                 isBridgeSender: IsBridge());
         }
 
-        public async Task StopTyping(long userId, string groupId, string groupType)
+        public async Task StopTyping(long userId, long groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
-            
+
             string groupKey;
             if (groupType == ConstChat.PrivateType)
             {
-                if (!long.TryParse(groupId, out var conversationId)) return;
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
+                //if (!long.TryParse(groupId, out var conversationId)) return;
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(groupId);
             }
             else
             {
-                groupKey = GenerateSignalRGroupKey.GenerateKey(long.Parse(groupId), groupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
             }
 
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
@@ -854,7 +854,7 @@ namespace Messenger.API.Hubs
                 isBridgeSender: IsBridge());
         }
 
-        public async Task MarkMessageAsRead(long currentUserId, string groupId, string groupType, long messageId)
+        public async Task MarkMessageAsRead(long currentUserId, long groupId, string groupType, long messageId)
         {
             if (currentUserId <= 0 || messageId <= 0) return;
             if (!IsBridge()) currentUserId = GetCurrentUserId();
@@ -871,7 +871,7 @@ namespace Messenger.API.Hubs
                 }
                 else
                 {
-                    if (!long.TryParse(groupId, out targetId)) return;
+                    if (groupId == 0) return;
                 }
 
                 var senderUserId = await _messageService.MarkMessageAsReadAsync(messageId, currentUserId, targetId, groupType);
@@ -906,7 +906,7 @@ namespace Messenger.API.Hubs
             }
         }
 
-        public async Task MarkAllMessagesAsRead(long currentUserId, string groupId, string groupType)
+        public async Task MarkAllMessagesAsRead(long currentUserId, long groupId, string groupType)
         {
             if (!IsBridge()) currentUserId = GetCurrentUserId();
 
@@ -918,7 +918,7 @@ namespace Messenger.API.Hubs
             }
             else
             {
-                if (!long.TryParse(groupId, out targetId)) return;
+                if (groupId == 0) return;
             }
 
             if (groupType == ConstChat.ClassGroupType && !await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, targetId))

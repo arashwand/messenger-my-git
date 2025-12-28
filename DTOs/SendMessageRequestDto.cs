@@ -6,7 +6,7 @@ namespace Messenger.DTOs
     public class SendMessageRequestDto
     {
         public long UserId { get; set; }
-        public string GroupId { get; set; }
+        public long GroupId { get; set; }
         public string MessageText { get; set; }
         public string GroupType { get; set; }
         public long? ReplyToMessageId { get; set; }

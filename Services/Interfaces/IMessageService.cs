@@ -25,7 +25,7 @@ namespace Messenger.Services.Interfaces
         /// <param name="files"></param>
         /// <param name="replyToMessageId"></param>
         /// <returns></returns>
-        Task<MessageDto> SendGroupMessageAsync(long senderUserId, string classId, string groupType,
+        Task<MessageDto> SendGroupMessageAsync(long senderUserId, long classId, string groupType,
             string messageText, List<long>? files = null, long? replyToMessageId = null, bool isPin = false, bool isPortalMessage = false);
 
         /// <summary>
@@ -97,7 +97,7 @@ namespace Messenger.Services.Interfaces
 
         // Private Chats & System Messages
         Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
-        Task<long> GetOtherUserIdInPrivateChat(string conversationId, long currentUserId);
+        Task<long> GetOtherUserIdInPrivateChat(long conversationId, long currentUserId);
     }
 }
 
