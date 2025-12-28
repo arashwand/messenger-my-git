@@ -17,5 +17,7 @@ namespace Messenger.Models.Models
         public virtual User User1 { get; set; }
 
         public virtual User User2 { get; set; }
+
+        public DateTime CreatedAt { get; set; }
     }
 }
