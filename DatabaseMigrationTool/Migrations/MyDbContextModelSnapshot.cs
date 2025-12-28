@@ -612,8 +612,8 @@ namespace DatabaseMigrationTool.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("ConversationId")
-                        .HasColumnType("bigint");
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<long>("User1Id")
                         .HasColumnType("bigint");

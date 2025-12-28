@@ -23,7 +23,7 @@ namespace Messenger.WebApp.ServiceHelper.Interfaces
         Task<IEnumerable<MessageDto>> GetChatMessagesAsync(long chatId,
         string chatType, int pageNumber, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false);
 
-        Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(long conversationId, int pageSize,
+        Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(Guid conversationId, int pageSize,
             long messageId = 0, bool loadOlder = false, bool loadBothDirections = false);
 
         Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(long classId, string chatType, int pageSize);

@@ -313,7 +313,7 @@
         // فراخوانی تابع باز کردن چت
         if (typeof window.GetSelectedChatMessages === 'function') {
             try {
-                window.GetSelectedChatMessages(userId, 'Private', false, true);
+                window.GetSelectedChatMessages(userId, 'Private');
                 
                 // Toast موفقیت
                 if (window.chatUIRenderer?.showToast) {

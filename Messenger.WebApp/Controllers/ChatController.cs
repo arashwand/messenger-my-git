@@ -158,8 +158,9 @@ namespace Messenger.WebApp.Controllers
         }
 
         [HttpGet("usersWithStatus")]
-        public async Task<IActionResult> GetUsersWithStatus([FromQuery] long groupId, [FromQuery] string groupType)
+        public async Task<IActionResult> GetUsersWithStatus([FromQuery] string groupId, [FromQuery] string groupType)
         {
+            if (string.IsNullOrEmpty(groupId) || string.IsNullOrEmpty(groupType)) return BadRequest("GroupId and GroupType are required.");
             try
             {
                 var users = await _hubBridgeService.GetUsersWithStatusAsync(groupId, groupType);

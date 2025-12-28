@@ -134,14 +134,14 @@
                     <ul class="dropdown-menu">
                         @if (chatType != "Private")
                         {
-                            <li>
-                                <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@(chatType == "Private" ? otherUserId : chatGroupId.ToString())', '@chatType')">
-                                    <img src="/chatzy/assets/iconsax/group.svg" alt="group" />
+                        <li>
+                            <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@(chatType == "Private" ? otherUserId : chatGroupId.ToString())', '@chatType')">
+                                <img src="/chatzy/assets/iconsax/group.svg" alt="group" />
 
-                                    &nbsp;
-                                    <span>اعضای گروه</span>
-                                </a>
-                            </li>
+                                &nbsp;
+                                <span>اعضای گروه</span>
+                            </a>
+                        </li>
                         }
                     </ul>
                 </div>

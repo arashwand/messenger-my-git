@@ -51,7 +51,7 @@ namespace Messenger.WebApp.ServiceHelper
             return response;
         }
 
-        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(long conversationId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
+        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(Guid conversationId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<MessageDto>>(
                 $"api/messages/private/conversation/{conversationId}?pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}&loadBothDirections={loadBothDirections}");

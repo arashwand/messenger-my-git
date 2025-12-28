@@ -229,7 +229,7 @@ namespace Messenger.API.Hubs
         }
 
         [Authorize(Policy = "IsBridgeService")]
-        public async Task AnnouncePresence(long userId)
+        public async Task AnnounceUserPresence(long userId)
         {
             if (userId <= 0) return;
 
@@ -409,19 +409,35 @@ namespace Messenger.API.Hubs
         }
 
         // =================== Helpers / Queries ===================
-        public async Task<List<object>> GetUsersWithStatus(string groupId, string groupType)
+        public async Task<Dictionary<long, bool>> GetUsersWithStatus(long[] userIds)
         {
-            var groupKey = (groupType == ConstChat.ClassGroupType ? ConstChat.ClassGroup : ConstChat.ChannelGroup) + groupId;
-            var onlineUserIds = await _userStatusService.GetOnlineUsersAsync(groupKey);
-            var onlineSet = new HashSet<long>(onlineUserIds);
+            if (userIds == null || !userIds.Any())
+            {
+                return new Dictionary<long, bool>();
+            }
 
-            IEnumerable<UserDto> allUsers;
-            if (groupType == ConstChat.ClassGroupType)
-                allUsers = await _classGroupService.GetClassGroupMembersInternalAsync(long.Parse(groupId));
-            else
-                allUsers = await _channelService.GetChannelMembersInternalAsync(long.Parse(groupId));
+            // This is a simplified approach. A more optimized version might involve
+            // checking a Redis cache that stores the last known status for each user.
+            // For now, we'll assume a user is online if they are in ANY of their groups.
+            // This is not perfectly accurate but serves as a good starting point.
 
-            return allUsers.Select(u => new { UserId = u.UserId, UserName = u.NameFamily, ProfilePic = u.ProfilePicName, IsOnline = onlineSet.Contains(u.UserId) }).Cast<object>().ToList();
+            var result = new Dictionary<long, bool>();
+            foreach (var userId in userIds)
+            {
+                // A user is considered "online" if they are active in any of their associated groups.
+                var groupKeys = await _userStatusService.GetUserGroupKeysAsync(userId);
+                bool isOnline = false;
+                if (groupKeys != null && groupKeys.Any())
+                {
+                    // Check if the user is marked as online in any of their groups.
+                    // This is an approximation. For true "global" online status,
+                    // a different Redis structure might be better (e.g., a single key per user).
+                    isOnline = await _userStatusService.IsUserOnlineInAnyGroupAsync(userId);
+                }
+                result[userId] = isOnline;
+            }
+
+            return result;
         }
 
         private (long groupId, string groupType) ParseGroupKey(string groupKey)
@@ -784,23 +800,22 @@ namespace Messenger.API.Hubs
             }
         }
 
-        public async Task Typing(long userId, string groupId, string groupType)
+        public async Task SendTypingSignal(long userId, long groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
             var fullName = GetCurrentUserFullName();
-            
+
             string groupKey;
             if (groupType == ConstChat.PrivateType)
             {
-                var otherUserId = await _messageService.GetOtherUserIdInPrivateChat(groupId, userId);
-                if(otherUserId == 0) return;
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, otherUserId);
+                // For private chats, groupId is the ConversationId.
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(groupId);
             }
             else
             {
-                groupKey = GenerateSignalRGroupKey.GenerateKey(long.Parse(groupId), groupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
             }
-            
+
             _logger.LogInformation("Typing event sent for user {UserId} in group {GroupKey}", userId, groupKey);
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
                 groupKey,
@@ -811,20 +826,19 @@ namespace Messenger.API.Hubs
                 isBridgeSender: IsBridge());
         }
 
-        public async Task StopTyping(long userId, string groupId, string groupType)
+        public async Task StopTyping(long userId, long groupId, string groupType)
         {
             if (!IsBridge()) userId = GetCurrentUserId();
-            
+
             string groupKey;
             if (groupType == ConstChat.PrivateType)
             {
-                var otherUserId = await _messageService.GetOtherUserIdInPrivateChat(groupId, userId);
-                if(otherUserId == 0) return;
-                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(userId, otherUserId);
+                // For private chats, groupId is the ConversationId.
+                groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(groupId);
             }
             else
             {
-                groupKey = GenerateSignalRGroupKey.GenerateKey(long.Parse(groupId), groupType);
+                groupKey = GenerateSignalRGroupKey.GenerateKey(groupId, groupType);
             }
 
             await this.BroadcastToGroupAndBridgeAsync(_logger, BridgeGroupName,
@@ -836,7 +850,7 @@ namespace Messenger.API.Hubs
                 isBridgeSender: IsBridge());
         }
 
-        public async Task MarkMessageAsRead(long currentUserId, string groupId, string groupType, long messageId)
+        public async Task MarkMessageAsRead(long currentUserId, long groupId, string groupType, long messageId)
         {
             if (currentUserId <= 0 || messageId <= 0) return;
             if (!IsBridge()) currentUserId = GetCurrentUserId();
@@ -845,15 +859,12 @@ namespace Messenger.API.Hubs
 
             try
             {
-                long targetId = 0;
+                long targetId = groupId;
                 if (groupType == ConstChat.PrivateType)
                 {
-                    targetId = await _messageService.GetOtherUserIdInPrivateChat(groupId, currentUserId);
+                    // For private chats, groupId is the ConversationId. We need the other user's ID for some logic.
+                    targetId = await _messageService.GetOtherUserIdInPrivateChatAsync(groupId, currentUserId);
                     if (targetId == 0) return;
-                }
-                else
-                {
-                    if (!long.TryParse(groupId, out targetId)) return;
                 }
 
                 var senderUserId = await _messageService.MarkMessageAsReadAsync(messageId, currentUserId, targetId, groupType);
@@ -888,19 +899,15 @@ namespace Messenger.API.Hubs
             }
         }
 
-        public async Task MarkAllMessagesAsRead(long currentUserId, string groupId, string groupType)
+        public async Task MarkAllMessagesAsRead(long currentUserId, long groupId, string groupType)
         {
             if (!IsBridge()) currentUserId = GetCurrentUserId();
 
-            long targetId = 0;
+            long targetId = groupId;
             if (groupType == ConstChat.PrivateType)
             {
-                targetId = await _messageService.GetOtherUserIdInPrivateChat(groupId, currentUserId);
+                targetId = await _messageService.GetOtherUserIdInPrivateChatAsync(groupId, currentUserId);
                 if (targetId == 0) return;
-            }
-            else
-            {
-                if (!long.TryParse(groupId, out targetId)) return;
             }
 
             if (groupType == ConstChat.ClassGroupType && !await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, targetId))

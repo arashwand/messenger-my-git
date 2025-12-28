@@ -46,7 +46,7 @@ namespace Messenger.Services.Interfaces
         string chatType, long currentUserId, int pageNumber, int pageSize,
             long messageId, bool loadOlder = false, bool loadBothDirections = false);
 
-        Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize,
+        Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(Guid conversationId, long currentUserId, int pageSize,
             long messageId, bool loadOlder = false, bool loadBothDirections = false);
 
         Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(long classId, string chatType, long currentUserId, int pageSize);
@@ -97,7 +97,7 @@ namespace Messenger.Services.Interfaces
 
         // Private Chats & System Messages
         Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
-        Task<long> GetOtherUserIdInPrivateChat(string conversationId, long currentUserId);
+        Task<long> GetOtherUserIdInPrivateChatAsync(long conversationId, long currentUserId);
     }
 }
 
