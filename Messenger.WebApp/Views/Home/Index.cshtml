@@ -290,19 +290,19 @@
             GetUserChats();
 
             // When a chat is selected
-            window.GetSelectedChatMessages = function(chatId, groupType,lastReadMessageId) {
+            window.GetSelectedChatMessages = function(chatId, groupType,lastReadMessageId,isNewChat) {
                 console.log("chatId selected = " + chatId + " and groupType : " + groupType);
                 ChatActivated(chatId, groupType);
-                console.log('select chat and get closest id : LastReadMessageIdOnChatList value is : ' + lastReadMessageId);
+                console.log('select chat and get closest id : LastReadMessageIdOnChatList value is : ' + lastReadMessageId + ' isnewchat : '+ isNewChat);
                 $.ajax({
                     url: '/Home/GetChatMessages',
                     type: 'GET',
-                    data: { chatId: chatId, groupType: groupType, messageId: lastReadMessageId },
+                    data: { chatId: chatId, groupType: groupType, messageId: lastReadMessageId ,isNewChat: isNewChat},
                     success: function (data) {
                         $('#chat-details-panel').html(data).addClass('visible');
-
+                        let conversationId = $('#chatKey').val();
                         // push state so back/forward will reflect chat
-                        try { pushChatToUrl(groupType, chatId); } catch (e) { console.error(e); }
+                        try { pushChatToUrl(groupType, conversationId); } catch (e) { console.error(e); }
 
                         window.chatApp.reAttachScrollListener();
 
@@ -310,7 +310,10 @@
                             init_iconsax();
                         }
 
-                        $('.groupName').text(chatSelectedTitle);//--عنوان گروه
+                        if(!isNewChat){
+                            $('.groupName').text(chatSelectedTitle);//--عنوان گروه
+                        }
+
                         // مخفی کردن عناصر هنگام انتخاب چت
                         $('.hide-on-chat-select').addClass('slide-out');
 
@@ -451,9 +454,17 @@
 
         function ChatActivated(chatId, groupType) {
             console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
-            var selectedChat = $(`#${groupType}_${chatId}`);
 
-            chatSelectedTitle = selectedChat. find('.name').text();
+            var selectedChat = $(`#${groupType}_${chatId}`);
+            
+            //بررسی بشه اگه نوع چت خصوصی باود ایدی خصوصی را برای یافتن نام چت جستجو کند
+            if(groupType ==='Private'){
+                chatSelectedTitle = $(`#${groupType}_${chatId}`).find('.name').text();
+            }else{
+                chatSelectedTitle = selectedChat.find('.name').text();
+            }
+
+            
             console.log('---' + chatSelectedTitle);
 
             let selectedChatId = `${groupType}_${chatId}`;

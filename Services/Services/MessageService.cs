@@ -650,7 +650,7 @@ namespace Messenger.Services.Services
         }
 
         /// <summary>
-        /// 
+        /// بررسی برای ایجاد چت زمانی که سرچ انجام شد
         /// </summary>
         /// <param name="userId1">Sender</param>
         /// <param name="userId2">Getter</param>
@@ -797,6 +797,17 @@ namespace Messenger.Services.Services
             return await GetChatMessagesInternal(chatId, chatType, currentUserId, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
         }
 
+
+        /// <summary>
+        /// دریافت پیامهای چت دونفره
+        /// </summary>
+        /// <param name="conversationId"></param>
+        /// <param name="currentUserId"></param>
+        /// <param name="pageSize"></param>
+        /// <param name="messageId"></param>
+        /// <param name="loadOlder"></param>
+        /// <param name="loadBothDirections"></param>
+        /// <returns></returns>
         public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false)
         {
             var conversation = await _context.PrivateChatConversations
