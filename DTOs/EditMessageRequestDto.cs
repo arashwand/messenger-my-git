@@ -8,7 +8,7 @@
     {
         public long UserId { get; set; }
         public long MessageId { get; set; }
-        public int GroupId { get; set; }
+        public string GroupId { get; set; }
         public string MessageText { get; set; }
         public string GroupType { get; set; }
         public long? ReplyToMessageId { get; set; }

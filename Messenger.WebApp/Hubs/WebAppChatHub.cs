@@ -28,7 +28,7 @@ namespace Messenger.WebApp.Hubs
         // متدهای جدید که مستقیماً از کلاینت (chatHub.js) فراخوانی می شوند
         // و جایگزین اکشن های کنترلر می شوند.
 
-        public async Task SendTypingSignal(int groupId, string groupType)
+        public async Task SendTypingSignal(long groupId, string groupType)
         {
             var userId = long.Parse(Context.UserIdentifier);
             if (userId <= 0)
@@ -39,7 +39,7 @@ namespace Messenger.WebApp.Hubs
             await _hubBridgeService.SendTypingSignalAsync(userId, groupId, groupType);
         }
 
-        public async Task SendStopTypingSignal(int groupId, string groupType)
+        public async Task SendStopTypingSignal(long groupId, string groupType)
         {
 
             // شناسه کاربر فعلی را از Context هاب دریافت کنید
@@ -51,7 +51,7 @@ namespace Messenger.WebApp.Hubs
             await _hubBridgeService.SendStopTypingSignalAsync(userId, groupId, groupType);
         }
 
-        public async Task MarkMessageAsRead(int groupId, string groupType, long messageId)
+        public async Task MarkMessageAsRead(long groupId, string groupType, long messageId)
         {
             var userId = long.Parse(Context.UserIdentifier);
             if (userId <= 0)
@@ -61,7 +61,7 @@ namespace Messenger.WebApp.Hubs
             await _hubBridgeService.MarkMessageAsReadAsync(userId, groupId, groupType, messageId);
         }
 
-        public async Task MarkAllMessagesAsRead(int groupId, string groupType)
+        public async Task MarkAllMessagesAsRead(long groupId, string groupType)
         {
             var userId = long.Parse(Context.UserIdentifier);
             if (userId <= 0)

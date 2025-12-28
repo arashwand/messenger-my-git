@@ -7,6 +7,10 @@ namespace Messenger.API.ServiceHelper.Interfaces
         Task<BroadcastResultDto> BroadcastAsync(long senderUserId, SendMessageToAllFromPortalDto request);
 
 
+
+        Task<BroadcastResultDto> BroadcasPrivateMessagetAsync(long senderUserId, SendPrivateMessageToAllFromPortalDto request);
+
+
         /// <summary>
         /// ارسال پیام به یک هدف خاص: فرد، گروه یا کانال
         /// </summary>

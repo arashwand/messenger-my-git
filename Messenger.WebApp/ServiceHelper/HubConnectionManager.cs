@@ -1,4 +1,4 @@
-﻿using Azure.Core;
+using Azure.Core;
 using Messenger.DTOs;
 using Messenger.Models.Models;
 using Messenger.Tools;
@@ -27,6 +27,7 @@ namespace Messenger.WebApp.ServiceHelper
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IHubContext<WebAppChatHub> _webAppHubContext;
         private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
 
         public string ClientConnectionId => _hubConnection?.ConnectionId;
@@ -39,7 +40,9 @@ namespace Messenger.WebApp.ServiceHelper
         public HubConnectionManager(ILogger<HubConnectionManager> logger,
             IOptions<ApiSettings> apiSettings,
             IHubContext<WebAppChatHub> webAppHubContext,
-            IConfiguration configuration, IHttpClientFactory httpClientFactory)
+            IConfiguration configuration, 
+            IHttpClientFactory httpClientFactory,
+            IHttpContextAccessor httpContextAccessor)
         {
             _logger = logger;
             _hubUrl = $"{apiSettings.Value.BaseUrl.TrimEnd('/')}/chathub";
@@ -47,6 +50,7 @@ namespace Messenger.WebApp.ServiceHelper
             _httpClientFactory = httpClientFactory;
             _webAppHubContext = webAppHubContext;
             _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
             _logger.LogInformation("HubConnectionManager initialized. Hub URL: {HubUrl}", _hubUrl);
         }
 
@@ -102,6 +106,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
+        
         public async Task ConnectAsync(string token)
         {
             if (IsConnected) return;
@@ -153,7 +158,7 @@ namespace Messenger.WebApp.ServiceHelper
         }
 
 
-        public Task<List<object>> GetUsersWithStatusAsync(string groupId, string groupType)
+        public Task<List<object>> GetUsersWithStatusAsync(long groupId, string groupType)
             => InvokeHubMethodWithResultAsync<List<object>>("GetUsersWithStatus", groupId, groupType);
 
         // جهت انلاین نمودن کاربر
@@ -230,16 +235,90 @@ namespace Messenger.WebApp.ServiceHelper
                         return;
                     }
 
-                    _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, Type={Type}, ReceiverUserId={Receiver}",
-                        messageDto.MessageId, messageDto.MessageType, messageDto.ReceiverUserId);
+                    _logger.LogInformation("Bridge received ReceiveMessage: MessageId={MessageId}, ChatKey={ChatKey}, GroupType={GroupType}, SenderId={SenderId}",
+                        messageDto.MessageId, messageDto.ChatKey, messageDto.GroupType, messageDto.SenderUserId);
 
-                    var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType);
-
-                    // ارسال به همه کلاینت‌های WebApp یا به کاربر خاص برای پیام خصوصی
-                    if (messageDto.MessageType == (byte)EnumMessageType.Private && messageDto.ReceiverUserId.HasValue)
+                    // ✅ برای Private messages: استخراج chatKey و استفاده از آن برای routing
+                    string chatKey = null;
+                    
+                    if (!string.IsNullOrEmpty(messageDto.ChatKey))
                     {
+                        // اگر ChatKey در messageDto موجود است، از آن استفاده کن
+                        chatKey = messageDto.ChatKey;
+                        
+                        // برای Private: محاسبه groupId برای هر کاربر
+                        if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                        {
+                            var currentUserId = GetCurrentUserId();
+                            
+                            if (currentUserId > 0)
+                            {
+                                // محاسبه otherUserId (کاربر مقابل)
+                                long otherUserId;
+                                if (messageDto.SenderUserId == currentUserId)
+                                {
+                                    // من فرستندهام → نمایش در چت با گیرنده
+                                    otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                                }
+                                else
+                                {
+                                    // من گیرندهام → نمایش در چت با فرستنده
+                                    otherUserId = messageDto.SenderUserId;
+                                }
+                                
+                                if (otherUserId > 0)
+                                {
+                                    groupId = otherUserId;
+                                    groupType = "Private";
+                                    
+                                    _logger.LogInformation($"Private message routed: currentUser={currentUserId}, otherUser={otherUserId}, groupId={groupId}, ChatKey={chatKey}");
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // اگر ChatKey موجود نیست، از روش قدیمی استفاده کن
+                        if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                        {
+                            var currentUserId = GetCurrentUserId();
+                            
+                            if (currentUserId > 0)
+                            {
+                                long otherUserId;
+                                if (messageDto.SenderUserId == currentUserId)
+                                {
+                                    otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                                }
+                                else
+                                {
+                                    otherUserId = messageDto.SenderUserId;
+                                }
+                                
+                                if (otherUserId > 0)
+                                {
+                                    groupId = otherUserId;
+                                    groupType = "Private";
+                                }
+                            }
+                        }
+                    }
+
+                    var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType,chatKey);
+
+                    // ✅ ارسال به گروه با استفاده از chatKey
+                    if (!string.IsNullOrEmpty(chatKey))
+                    {
+                        await _webAppHubContext.Clients.All.SendAsync("ReceiveMessage", payload2);
+                       // await _webAppHubContext.Clients.Group(chatKey).SendAsync("ReceiveMessage", payload2);
+                        _logger.LogInformation($"Message forwarded to WebApp group: {chatKey}");
+                    }
+                    else if (messageDto.MessageType == (byte)EnumMessageType.Private && messageDto.ReceiverUserId.HasValue)
+                    {
+                        // Fallback: ارسال به کاربران خاص اگر chatKey موجود نبود
                         await _webAppHubContext.Clients.User(messageDto.ReceiverUserId.Value.ToString()).SendAsync("ReceiveMessage", payload2);
-                        await _webAppHubContext.Clients.User(messageDto.SenderUserId.ToString()).SendAsync("ReceiveMessage", payload2); // ارسال به فرستنده هم
+                        await _webAppHubContext.Clients.User(messageDto.SenderUserId.ToString()).SendAsync("ReceiveMessage", payload2);
+                        _logger.LogInformation($"Message forwarded to users (fallback): {messageDto.ReceiverUserId}, {messageDto.SenderUserId}");
                     }
                     else
                     {
@@ -292,6 +371,34 @@ namespace Messenger.WebApp.ServiceHelper
                     {
                         _logger.LogError("Invalid payload for ReceiveEditedMessage: expected 1 or 3 elements, got {Count}", payload.Length);
                         return;
+                    }
+
+                    // ✅ برای Private messages: محاسبه groupId از دیدگاه کاربر فعلی
+                    if (messageDto.GroupType == "Private" || messageDto.MessageType == (byte)EnumMessageType.Private)
+                    {
+                        var currentUserId = GetCurrentUserId();
+                        
+                        if (currentUserId > 0)
+                        {
+                            // محاسبه otherUserId (کاربر مقابل)
+                            long otherUserId;
+                            if (messageDto.SenderUserId == currentUserId)
+                            {
+                                // من فرستندهام → نمایش در چت با گیرنده
+                                otherUserId = messageDto.OwnerId > 0 ? messageDto.OwnerId : (messageDto.ReceiverUserId ?? 0);
+                            }
+                            else
+                            {
+                                // من گیرندهام → نمایش در چت با فرستنده
+                                otherUserId = messageDto.SenderUserId;
+                            }
+                            
+                            if (otherUserId > 0)
+                            {
+                                groupId = otherUserId;
+                                groupType = "Private";
+                            }
+                        }
                     }
 
                     var payload2 = CreateReceiveMessagePayload(messageDto, groupId, groupType);
@@ -408,12 +515,22 @@ namespace Messenger.WebApp.ServiceHelper
             });
 
             // رویداد دریافت تعداد پیام خوانده نشده در چت
-            _hubConnection.On<long, string, int>("UpdateUnreadCount", async (userId, key, unreadCount) =>
+            _hubConnection.On<long, object[]>("UpdateUnreadCount", async (userId, args) =>
             {
-                // Forward to the specific user
-                await _webAppHubContext.Clients.User(userId.ToString())
-                    .SendAsync("UpdateUnreadCount", key, unreadCount);
+                try
+                {
+                    _logger.LogInformation($"UpdateUnreadCount event called: userId ={userId} and key: {args[0]} and countUnread : {args[1]}", args[0], args[1]);
+
+                    // Forward to the specific user in WebAppChatHub
+                    await _webAppHubContext.Clients.User(userId.ToString())
+                        .SendAsync("UpdateUnreadCount", args[0], args[1]);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing UpdateUnreadCount event");
+                }
             });
+
 
             // این رویداد فقط برای تایید ارسال موفق پیام به خود فرستنده است
             _hubConnection.On<MessageDto>("MessageSentSuccessfully", async (savedMessage) =>
@@ -736,7 +853,7 @@ namespace Messenger.WebApp.ServiceHelper
         /// <param name="groupId">شناسه گروه</param>
         /// <param name="groupType">نوع گروه</param>
         /// <returns>شیء payload برای ارسال</returns>
-        private object CreateReceiveMessagePayload(MessageDto messageDto, long groupId, string groupType)
+        private object CreateReceiveMessagePayload(MessageDto messageDto, long groupId, string groupType, string chatKey = null)
         {
             object replyMessage = null;
             if (messageDto.ReplyMessageId != null && messageDto.ReplyMessage != null)
@@ -771,6 +888,7 @@ namespace Messenger.WebApp.ServiceHelper
                 messageText = messageDto.MessageText?.MessageTxt ?? "",
                 groupId = groupId,
                 groupType = groupType,
+                chatKey = chatKey,
                 messageDateTime = messageDto.MessageDateTime.ToString("HH:mm"),
                 messageDate = messageDto.MessageDateTime,
                 profilePicName = messageDto.SenderUser?.ProfilePicName,
@@ -972,6 +1090,32 @@ namespace Messenger.WebApp.ServiceHelper
                 return list;
             }
             return Enumerable.Empty<long>();
+        }
+
+        /// <summary>
+        /// دریافت userId کاربر فعلی از Claims
+        /// </summary>
+        private long GetCurrentUserId()
+        {
+            try
+            {
+                // فرض: userId در Claims با نام "UserId" یا "sub" ذخیره شده
+                var userIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("UserId")?.Value
+                               ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value;
+                
+                if (long.TryParse(userIdClaim, out long userId))
+                {
+                    return userId;
+                }
+                
+                _logger.LogWarning("Could not parse userId from claims");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current user ID");
+                return 0;
+            }
         }
 
         #endregion

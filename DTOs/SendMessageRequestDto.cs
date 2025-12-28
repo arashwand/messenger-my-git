@@ -6,7 +6,7 @@ namespace Messenger.DTOs
     public class SendMessageRequestDto
     {
         public long UserId { get; set; }
-        public int GroupId { get; set; }
+        public long GroupId { get; set; }
         public string MessageText { get; set; }
         public string GroupType { get; set; }
         public long? ReplyToMessageId { get; set; }
@@ -35,6 +35,15 @@ namespace Messenger.DTOs
         [Required]
         public string MessageText { get; set; }
         public bool IsPin { get; set; } = true;
+    }
+
+    public class SendPrivateMessageToAllFromPortalDto
+    {
+        public List<long> UserIds { get; set; }
+        public EnumMessageType MessageType { get; set; } = EnumMessageType.Private;
+
+        [Required]
+        public string MessageText { get; set; }
     }
 
     /// <summary>

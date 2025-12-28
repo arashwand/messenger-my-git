@@ -19,6 +19,13 @@
             chatGroupId = groupId;
         }
     }
+    
+    // ✅ دریافت نام چت
+    var chatName = ViewData["chatName"]?.ToString() ?? "چت";
+    
+    // دریافت chatKey برای چت‌های خصوصی
+    var chatKey = ViewData["chatKey"]?.ToString() ?? "";
+    
     string[] AllowedImages = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"];
     if (ViewData.ContainsKey("allowedImagesExtention"))
     {
@@ -28,7 +35,7 @@
     var chatType = ViewData["chatType"]?.ToString() ?? "ClassGroup";
 
     var pinnedMessageIdGenerated = "pinnedMessage_" + chatGroupId + "_" + chatType;
-
+    var otherUserId = ViewData["otherUserId"]?.ToString() ?? "0";
     var roleName = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
     var pinnedMessages = Model.Where(m => m.IsPin).OrderBy(m => m.PinnedAt);
 }
@@ -93,6 +100,7 @@
    
 </style>
 
+<input type="hidden" id="chatKey" value="@chatKey" />
 <input type="hidden" id="current-group-id-hidden-input" value="@chatGroupId" />
 <input type="hidden" id="current-group-type-hidden-input" value="@chatType" />
 <input type="hidden" id="userRoleName" value="@roleName" />
@@ -110,7 +118,7 @@
                         @* <img src="/chatzy/assets/iconsax/group.svg" alt="group" />*@
                     </div>
                     <div>
-                        <h4 class="fw-semibold groupName"></h4>
+                        <h4 class="fw-semibold groupName">@chatName</h4>
                         <small class="text-muted" id="typing-indicator-@chatGroupId"></small>
                         <div id="@pinnedMessageIdGenerated" class="pinnedMessagesPlaceholder" data-chat-id="@chatGroupId" data-chat-type="@chatType"></div>
 
@@ -124,14 +132,17 @@
                         <i class="iconsax icon-btn" data-icon="menu-meatballs"> </i>
                     </a>
                     <ul class="dropdown-menu">
-                        <li>
-                            <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@chatGroupId', '@chatType')">
-                                <img src="/chatzy/assets/iconsax/group.svg" alt="group" />
+                        @if (chatType != "Private")
+                        {
+                            <li>
+                                <a class="dropdown-item align-items-center d-flex" href="#" onclick="GetChatDetails('@(chatType == "Private" ? otherUserId : chatGroupId.ToString())', '@chatType')">
+                                    <img src="/chatzy/assets/iconsax/group.svg" alt="group" />
 
-                                &nbsp;
-                                <span>اعضای گروه</span>
-                            </a>
-                        </li>
+                                    &nbsp;
+                                    <span>اعضای گروه</span>
+                                </a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>
@@ -347,8 +358,8 @@
                                         </div>
                                     }
 
-                                    <h5>
-                                        @Html.Raw(message.MessageText?.MessageTxt.Replace("\n", "<br />"))
+                                    <h5 style="white-space: pre-line;line-height:0.6;">
+                                        @message.MessageText?.MessageTxt
                                         @if (message.IsEdited)
                                         {
                                             <small class="text-muted fst-italic">(ویرایش شده)</small>

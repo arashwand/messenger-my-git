@@ -39,9 +39,9 @@ public partial class Message
 
     public virtual ICollection<MessageFoulReport> MessageFoulReports { get; set; } = new List<MessageFoulReport>();
 
-    public virtual ICollection<MessagePrivate> MessagePrivates { get; set; } = new List<MessagePrivate>();
-
     public virtual ICollection<MessageRead> MessageReads { get; set; } = new List<MessageRead>();
+
+    public virtual ICollection<MessageRecipient> MessageRecipients { get; set; } = new List<MessageRecipient>();
 
     public virtual ICollection<MessageSaved> MessageSaveds { get; set; } = new List<MessageSaved>();
 

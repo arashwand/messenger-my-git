@@ -37,7 +37,7 @@ public partial class IEMessengerDbContext : DbContext
 
     public virtual DbSet<MessageFoulReport> MessageFoulReports { get; set; }
 
-    
+    public virtual DbSet<MessageRecipient> MessageRecipients { get; set; }
 
     public virtual DbSet<MessageRead> MessageReads { get; set; }
 
@@ -57,7 +57,7 @@ public partial class IEMessengerDbContext : DbContext
 
     public DbSet<WebPushSubscription> PushSubscriptions { get; set; }
 
-
+    public virtual DbSet<PrivateChatConversation> PrivateChatConversations { get; set; }
 
 
     //    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -277,23 +277,6 @@ public partial class IEMessengerDbContext : DbContext
                 .HasConstraintName("FK_MessageFoulReport_Messages");
         });
 
-        modelBuilder.Entity<MessagePrivate>(entity =>
-        {
-            entity.ToTable("MessagePrivate");
-
-            entity.Property(e => e.MessagePrivateId).HasColumnName("MessagePrivateID");
-            entity.Property(e => e.GetterUserId).HasColumnName("GetterUserID");
-            entity.Property(e => e.MessageId).HasColumnName("MessageID");
-
-            entity.HasOne(d => d.GetterUser).WithMany(p => p.MessagePrivates)
-                .HasForeignKey(d => d.GetterUserId)
-                .HasConstraintName("FK_MessagePrivate_Users");
-
-            entity.HasOne(d => d.Message).WithMany(p => p.MessagePrivates)
-                .HasForeignKey(d => d.MessageId)
-                .HasConstraintName("FK_MessagePrivate_Messages");
-        });
-
         modelBuilder.Entity<MessageRead>(entity =>
         {
             entity.HasKey(e => e.ReadMessageId);
@@ -320,6 +303,32 @@ public partial class IEMessengerDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_MessageRead_Users");
+        });
+
+        modelBuilder.Entity<MessageRecipient>(entity =>
+        {
+            entity.HasKey(e => e.MessageRecipientId);
+
+            entity.ToTable("MessageRecipients");
+
+            entity.HasIndex(e => new { e.MessageId, e.UserConversationId }, "IX_MessageRecipients_Message_Recipient");
+
+            entity.HasIndex(e => e.UserConversationId, "IX_MessageRecipients_RecipientUserId");
+
+            entity.Property(e => e.MessageRecipientId).HasColumnName("MessageRecipientID");
+            entity.Property(e => e.MessageId).HasColumnName("MessageID");
+            entity.Property(e => e.UserConversationId).HasColumnName("RecipientUserID");
+            entity.Property(e => e.ReadDateTime).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Message).WithMany(p => p.MessageRecipients)
+                .HasForeignKey(d => d.MessageId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_MessageRecipients_Messages");
+
+            entity.HasOne(d => d.RecipientUser).WithMany(p => p.MessageRecipients)
+                .HasForeignKey(d => d.UserConversationId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MessageRecipients_Users");
         });
 
         modelBuilder.Entity<MessageSaved>(entity =>
@@ -440,6 +449,23 @@ public partial class IEMessengerDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ViewClassGroup_Users");
+        });
+
+        modelBuilder.Entity<PrivateChatConversation>(entity =>
+        {
+            entity.HasIndex(e => e.ConversationId).IsUnique();
+
+            entity.HasOne(d => d.User1)
+                .WithMany()
+                .HasForeignKey(d => d.User1Id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PrivateChatConversations_User1");
+
+            entity.HasOne(d => d.User2)
+                .WithMany()
+                .HasForeignKey(d => d.User2Id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_PrivateChatConversations_User2");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -1,5 +1,6 @@
 ﻿using Azure.Core;
 using Messenger.API.ServiceHelper.Interfaces;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System.Net.Http;
 
@@ -8,14 +9,16 @@ namespace Messenger.API.Services
     public class RedisUserStatusService : IRedisUserStatusService
     {
         private readonly IDatabase _db;
+        private readonly ILogger<RedisUserStatusService> _logger;
         private const int TTL_SECONDS = 5 * 60; // زمان زنده ماندن کلید
 
         // زمان انقضا برای کش گروه‌های کاربر (مثلاً ۲۴ ساعت)
         private const int USER_GROUPS_CACHE_TTL_SECONDS = 86400;
 
-        public RedisUserStatusService(IConnectionMultiplexer redis)
+        public RedisUserStatusService(IConnectionMultiplexer redis, ILogger<RedisUserStatusService> logger)
         {
             _db = redis.GetDatabase();
+            _logger = logger;
         }
 
         private string GetRedisKey(string groupKey)
@@ -90,6 +93,52 @@ namespace Messenger.API.Services
             // ۴. تنظیم زمان انقضا برای این کلید.
             // این کار مهم است تا اگر عضویت کاربر در گروه‌ها تغییر کرد، کش پس از مدتی باطل شود و دوباره از دیتابیس خوانده شود.
             await _db.KeyExpireAsync(userGroupsKey, TimeSpan.FromSeconds(USER_GROUPS_CACHE_TTL_SECONDS));
+        }
+
+        /// <summary>
+        /// دریافت تعداد تقریبی کل کاربران آنلاین در تمام گروهها
+        /// از کلیدهای online:* استفاده میکند با بهینهسازی برای کاهش تعداد درخواستها
+        /// </summary>
+        public async Task<int> GetTotalOnlineUsersCountAsync()
+        {
+            try
+            {
+                var server = _db.Multiplexer.GetServer(_db.Multiplexer.GetEndPoints().First());
+                var keys = server.Keys(pattern: "online:*", pageSize: 100).Take(100).ToArray();
+                
+                if (!keys.Any())
+                    return 0;
+
+                var uniqueUsers = new HashSet<long>();
+                
+                // استفاده از batch برای کاهش round trips
+                var batch = _db.CreateBatch();
+                var tasks = new List<Task<RedisValue[]>>();
+                
+                foreach (var key in keys)
+                {
+                    tasks.Add(batch.SetMembersAsync(key));
+                }
+                
+                batch.Execute();
+                await Task.WhenAll(tasks);
+                
+                foreach (var task in tasks)
+                {
+                    foreach (var member in task.Result)
+                    {
+                        uniqueUsers.Add((long)member);
+                    }
+                }
+                
+                return uniqueUsers.Count;
+            }
+            catch (Exception ex)
+            {
+                // در صورت خطا، مقدار محافظهکارانه برمیگردانیم
+                _logger.LogError(ex, "Error getting total online users count");
+                return 0;
+            }
         }
 
     }

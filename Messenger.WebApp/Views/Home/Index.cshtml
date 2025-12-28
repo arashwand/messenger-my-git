@@ -7,7 +7,9 @@
 @using Messenger.Tools
 
 @section Styles {
-
+    <style>
+        
+    </style>
 }
 
 <input type="hidden" value="@User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value" id="userId" />
@@ -16,6 +18,7 @@
 <input type="hidden" value="@(ViewData["baseUrl"] ?? "")" id="baseUrl" />
 <input type="hidden" value="" id="groupType" />
 <input type="hidden" value="@Model" id="linkToChatId" />
+<input type="hidden" value="@User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value" id="userRole" />
 
 <div id="main-page-wrapper" class="hide-on-chat-select">
 
@@ -34,7 +37,11 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-sm-3 gap-2">
-
+                    <!-- دکمه جستجو برای همه نقش‌ها -->
+                    <a href="#" data-bs-toggle="offcanvas" data-bs-target="#search-offcanvas">
+                        <i class="iconsax icon-btn" data-icon="search-normal-2"></i>
+                    </a>
+                    
                     <div class="dropdown more-options dropdown-menu-end">
                         <a class="btn dropdown-toggle mt-0 p-0" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="iconsax icon-btn" data-icon="menu-meatballs"> </i>
@@ -55,8 +62,6 @@
         </div>
     </header>
     <!-- header end -->
-
-
 
     <div id="main-content-body" class="hide-on-chat-select">
 
@@ -154,6 +159,7 @@
     <script src="~/js/modal-lightbox.js" asp-append-version="true"></script>
     <script src="~/js/mobile-layout-handler.js" asp-append-version="true"></script>
     <script src="~/js/notification.js" asp-append-version="true"></script>
+    <script src="~/js/chatSearch.js" asp-append-version="true"></script>
 
     <script>
 
@@ -168,11 +174,14 @@
 
         function pushChatToUrl(groupType, chatId) {
             try {
+                let chatParam = `${groupType}_${chatId}`;
+
                 const url = new URL(window.location.href);
-                const value = `${groupType}_${chatId}`;
-                url.searchParams.set('chat', value);
-                history.pushState({ chat: value }, '', url.toString());
-            } catch (e) { console.error(e); }
+                url.searchParams.set('chat', chatParam);
+                window.history.pushState({ chat: chatParam }, '', url);
+            } catch (e) {
+                console.error('pushChatToUrl error:', e);
+            }
         }
 
         function replaceRemoveChatFromUrl() {
@@ -192,7 +201,8 @@
         }
 
         // Safe invoker that waits if window.GetSelectedChatMessages isn't defined yet
-        function safeInvokeGetSelected(chatId, groupType) {
+               // جایگزین تابع safeInvokeGetSelected قبلی با این نسخه
+         function safeInvokeGetSelected(chatId, groupType) {
             if (typeof window.GetSelectedChatMessages === 'function') {
                 try { window.GetSelectedChatMessages(chatId, groupType); } catch (err) { console.error(err); }
                 return;
@@ -222,18 +232,16 @@
             if (initialChat) {
                 const parts = initialChat.split('_').map(p => (p || '').trim()).filter(Boolean);
                 if (parts.length >= 2) {
-                    const a = parts[0], b = parts[1];
-                    if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                        safeInvokeGetSelected(b, a);
-                        // ensure URL has the same canonical param
-                        pushChatToUrl(a, b);
-                    } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                        safeInvokeGetSelected(a, b);
-                        pushChatToUrl(b, a);
-                    } else {
-                        safeInvokeGetSelected(a, b);
-                        pushChatToUrl(a, b);
-                    }
+                    // Improved parsing:
+                    // - If private chat (private_{id1}_{id2}) keep the full id part as "id1_id2"
+                    // - Otherwise try to detect canonical order; fallback to join remaining parts
+                    let groupType = parts[0];
+                    let chatId = parts.slice(1).join('_');
+
+                    // invoke loading with canonical groupType/chatId
+                    safeInvokeGetSelected(chatId, groupType);
+                    // ensure URL has canonical param (e.g. private_1_124644)
+                    pushChatToUrl(groupType, chatId);
                 }
             }
 
@@ -282,17 +290,16 @@
             GetUserChats();
 
             // When a chat is selected
-            window.GetSelectedChatMessages = function(chatId, groupType,lastReadMessageId) {
+            window.GetSelectedChatMessages = function(chatId, groupType,lastReadMessageId,isNewChat) {
                 console.log("chatId selected = " + chatId + " and groupType : " + groupType);
                 ChatActivated(chatId, groupType);
-                console.log('select chat and get closest id : LastReadMessageIdOnChatList value is : ' + lastReadMessageId);
+                console.log('select chat and get closest id : LastReadMessageIdOnChatList value is : ' + lastReadMessageId + ' isnewchat : '+ isNewChat);
                 $.ajax({
                     url: '/Home/GetChatMessages',
                     type: 'GET',
-                    data: { chatId: chatId, groupType: groupType, messageId: lastReadMessageId },
+                    data: { chatId: chatId, groupType: groupType, messageId: lastReadMessageId ,isNewChat: isNewChat},
                     success: function (data) {
                         $('#chat-details-panel').html(data).addClass('visible');
-
                         // push state so back/forward will reflect chat
                         try { pushChatToUrl(groupType, chatId); } catch (e) { console.error(e); }
 
@@ -302,7 +309,10 @@
                             init_iconsax();
                         }
 
-                        $('.groupName').text(chatSelectedTitle);//--عنوان گروه
+                        if(!isNewChat){
+                            $('.groupName').text(chatSelectedTitle);//--عنوان گروه
+                        }
+
                         // مخفی کردن عناصر هنگام انتخاب چت
                         $('.hide-on-chat-select').addClass('slide-out');
 
@@ -334,6 +344,12 @@
                 });
             };
 
+            // When a private chat is selected
+            window.GetPrivateChatMessages = function(chatKey, chatName, lastReadMessageId) {
+                console.log(`Loading private chat with key ${chatKey}, name: ${chatName}`);
+                window.GetSelectedChatMessages(chatKey, 'Private', lastReadMessageId);
+            };
+
             // When closing the chat view to go back to the list
             $(document).on('click', '#close-chat-panel-btn', function() {
                 $('#chat-details-panel').removeClass('visible');
@@ -358,15 +374,13 @@
                     // open chat described in state
                     const parts = chatParam.split('_').map(p => (p || '').trim()).filter(Boolean);
                     if (parts.length >= 2) {
-                        const a = parts[0], b = parts[1];
-                        // detect pattern (groupType_chatId or chatId_groupType)
-                        if (!/^\d+$/.test(a) && /^\d+$/.test(b)) {
-                            safeInvokeGetSelected(b, a);
-                        } else if (!/^\d+$/.test(b) && /^\d+$/.test(a)) {
-                            safeInvokeGetSelected(a, b);
-                        } else {
-                            safeInvokeGetSelected(a, b);
-                        }
+                        // Improved parsing (same logic as initial load):
+                        // - If private chat (private_{id1}_{id2}) keep the full id part as "id1_id2"
+                        // - Otherwise detect canonical order or fallback to join remaining parts
+                        let groupType = parts[0];
+                        let chatId = parts.slice(1).join('_');
+
+                        safeInvokeGetSelected(chatId, groupType);
                     }
                 } else {
                     // no chat in history state -> close chat panel
@@ -438,37 +452,45 @@
         var chatSelectedTitle = "";
 
         function ChatActivated(chatId, groupType) {
-             console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
-             var selectedChat = $(`#${groupType}_${chatId}`);
+            console.log(`chat Id and group type is : ${chatId} and ${groupType}`);
 
-             chatSelectedTitle = selectedChat.find('.name').text();
-             console.log('---------------------------------------------------------------------------------' + chatSelectedTitle);
+            var selectedChat = $(`#${groupType}_${chatId}`);
+            
+            //بررسی بشه اگه نوع چت خصوصی باود ایدی خصوصی را برای یافتن نام چت جستجو کند
+            if(groupType ==='Private'){
+                chatSelectedTitle = $(`#${groupType}_${chatId}`).find('.name').text();
+            }else{
+                chatSelectedTitle = selectedChat.find('.name').text();
+            }
 
+            
+            console.log('---' + chatSelectedTitle);
 
-             const selectedChatId = `${groupType}_${chatId}`
-             if(selectedChat.length) {
-                 const chatItemsBody = $('#chatContactTab');
-                 const chatItems = chatItemsBody.find('.active');
-                 chatItems.removeClass('active');
-                 selectedChat.addClass('active');
+            let selectedChatId = `${groupType}_${chatId}`;
+            window.activeGroupId = selectedChatId;
+            if(selectedChat.length) {
+                const chatItemsBody = $('#chatContactTab');
+                const chatItems = chatItemsBody.find('.active');
+                chatItems. removeClass('active');
+                selectedChat.addClass('active');
 
-                 if (window.chatApp && window.chatApp.connection) {
+                if (window.chatApp && window.chatApp.connection) {
                     if (window.activeGroupId) {
                         window.chatApp.connection.invoke("LeaveGroup", window.activeGroupId)
-                            //.catch(err => console.error('Error leaving group:', err));
-                             .catch(err => {
-                                 console.error('Error leaving group:', err);
-                                 window.chatUIRenderer.showToast("❌ خطا در ترک چت", "error");
-                             });
+                            .catch(err => {
+                                console.error('Error leaving group:', err);
+                                window.chatUIRenderer.showToast("❌ خطا در ترک چت", "error");
+                            });
                     }
-                    window.chatApp.connection.invoke("JoinGroup", selectedChatId)
-                        .catch(err =>{ 
+                    window.chatApp. connection.invoke("JoinGroup", selectedChatId)
+                        .catch(err =>{
                             console.error('Error joining group:', err);
-                            window.chatUIRenderer.showToast("❌ خطا در پیوستن به چت", "error");
+                            window.chatUIRenderer. showToast("❌ خطا در پیوستن به چت", "error");
                         });
-                 }
-                 window.activeGroupId = selectedChatId;
-             }
+                }
+                window.activeGroupId = selectedChatId; // ✅ مقدار صحیح ذخیره می‌شود
+                console.log(" selcted chat and window.activeGroupId:", window.activeGroupId);
+            }
         }
 
         window.GetChatDetails = function(chatId, groupType){

@@ -1,4 +1,6 @@
-﻿using Messenger.API.Helper;
+﻿using Hangfire;
+using Hangfire.SqlServer;
+using Messenger.API.Helper;
 using Messenger.API.Hubs;
 using Messenger.API.ServiceHelper;
 using Messenger.API.ServiceHelper.Interfaces; // Added for Redis service interfaces
@@ -43,6 +45,7 @@ builder.Services.Configure<TimeSettingOptions>(
 // Create Configuration variable to read from appSettings.json  
 var Configuration = builder.Configuration;
 builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages(); // Add Razor Pages support for Load Balancing Dashboard
 
 builder.Services.AddMemoryCache();
 
@@ -278,7 +281,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 // ثبت سرویس SSOApi با استفاده از HttpClientFactory
 builder.Services.AddHttpClient<IUserExternalApi, UserExternalApi>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7100/");
+    client.BaseAddress = new Uri(jwtSettings.Issuer);
     //client.BaseAddress = new Uri(ssoTokenEndpoint);
 });
 
@@ -304,7 +307,7 @@ builder.Services.AddScoped<IManagePushService, ManagePushService>();
 
 // Register custom Redis services
 builder.Services.AddScoped<RedisLastMessageService>();
-builder.Services.AddScoped<IRedisUserStatusService, RedisUserStatusService>();
+builder.Services.AddSingleton<IRedisUserStatusService, RedisUserStatusService>(); // Changed to Singleton for SystemMonitorService
 builder.Services.AddSingleton<IRedisUnreadManage, RedisUnreadManage>();
 
 // Register BroadcastService
@@ -327,6 +330,35 @@ builder.Services.AddHostedService<DeleteFileBackgroundService>();
 
 // background service for sync read\unread messages from Redis to SQL and vice bersa
 builder.Services.AddHostedService<UnreadMessageSyncService>();
+
+// Hangfire Configuration
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(ConnectionString, new SqlServerStorageOptions
+    {
+        CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+        SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+        QueuePollInterval = TimeSpan.Zero,
+        UseRecommendedIsolationLevel = true,
+        DisableGlobalLocks = true,
+        SchemaName = "HangfireMessenger"
+    }));
+
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = builder.Configuration.GetValue<int>("Hangfire:WorkerCount", 5); // پیشفرض: 5
+    options.Queues = builder.Configuration.GetSection("Hangfire:Queues").Get<string[]>() 
+        ?? new[] { "critical", "high", "default", "low" };
+});
+
+// Register Hangfire services
+builder.Services.AddScoped<IMessageQueueService, MessageQueueService>();
+builder.Services.AddScoped<ProcessMessageJob>();
+
+// Register System Monitor Service for Load Balancing
+builder.Services.AddSingleton<ISystemMonitorService, SystemMonitorService>();
 
 builder.Services.Configure<FileConfigSetting>(builder.Configuration.GetSection("FileStorage"));
 
@@ -377,6 +409,13 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Hangfire Dashboard
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new HangfireAuthorizationFilter() },
+    DashboardTitle = "Messenger Queue Dashboard"
+});
+
 
 app.MapOpenApi();
 
@@ -413,6 +452,7 @@ app.UseSwaggerUI(c =>
 
 // 7. Endpoints: Endpointهای برنامه (Controllers, Hubs, etc.) را تعریف می‌کند.
 app.MapControllers();
+app.MapRazorPages(); // Map Razor Pages for Load Balancing Dashboard
 app.MapHub<ChatHub>("/chathub");
 app.MapControllerRoute(
     name: "default",

@@ -39,11 +39,14 @@ namespace Messenger.Services.Interfaces
 
         // Retrieving Messages
         Task<MessageDto> GetMessageByIdAsync(long userId,long messageId);
-        Task<IEnumerable<MessageDto>> GetPrivateMessagesAsync(long userId1, long userId2, int pageNumber, int pageSize);
+        Task<PrivateChatDto> GetPrivateMessagesAsync(long currentUserId, long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false);
         Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, long currentUserId, int pageNumber, int pageSize);
 
         Task<IEnumerable<MessageDto>> GetChatMessages(long chatId,
         string chatType, long currentUserId, int pageNumber, int pageSize,
+            long messageId, bool loadOlder = false, bool loadBothDirections = false);
+
+        Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize,
             long messageId, bool loadOlder = false, bool loadBothDirections = false);
 
         Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(long classId, string chatType, long currentUserId, int pageSize);
@@ -72,10 +75,10 @@ namespace Messenger.Services.Interfaces
 
 
         // Edit
-        Task<MessageDto> EditMessageAsync(long messageId, long editorUserId, long groupId, string groupType, string? newMessageText = null,
+        Task<MessageDto> EditMessageAsync(long messageId, long editorUserId, string groupId, string groupType, string? newMessageText = null,
             List<long>? fileIds = null, List<long>? fileIdsToRemove = null);
 
-        Task<MessageDto> EditChannelMessageAsync(long messageId, long editorUserId, long groupId, string? newMessageText = null,
+        Task<MessageDto> EditChannelMessageAsync(long messageId, long editorUserId, string groupId, string? newMessageText = null,
             List<long>? fileIds = null, List<long>? fileIdsToRemove = null);
 
         Task<MessageDto> EditPrivateMessageAsync(long senderUserId, long messageId, long receiverUserId, string messageText,
@@ -91,6 +94,10 @@ namespace Messenger.Services.Interfaces
         Task<int> GetUnreadCountAsync(long userId, string groupType, long targetId);
         Task<List<UnreadMessageDto>> GetAllUnreadMessageInChat(long userId, long targetId, string groupType);
         Task<int> CalculateUnreadCountFromSqlAsync(long userId, long targetId, string groupType);
+
+        // Private Chats & System Messages
+        Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
+        Task<long> GetOtherUserIdInPrivateChat(long conversationId, long currentUserId);
     }
 }
 

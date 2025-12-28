@@ -57,7 +57,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public async Task<ClassGroupDto?> GetClassGroupByIdAsync(int classId)
+        public async Task<ClassGroupDto?> GetClassGroupByIdAsync(long classId)
         {
             try
             {
@@ -279,7 +279,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public async Task DeleteClassGroupAsync(int classId)
+        public async Task DeleteClassGroupAsync(long classId)
         {
             try
             {
@@ -300,7 +300,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public async Task<IEnumerable<UserDto>> GetClassGroupMembersAsync(int classId)
+        public async Task<IEnumerable<UserDto>> GetClassGroupMembersAsync(long classId)
         {
             try
             {
@@ -326,7 +326,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public async Task AddUserToClassGroupAsync(int classId, long userIdToAdd, long addedByUserId)
+        public async Task AddUserToClassGroupAsync(long classId, long userIdToAdd, long addedByUserId)
         {
             try
             {
@@ -348,7 +348,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public async Task RemoveUserFromClassGroupAsync(int classId, long userIdToRemove, long removedByUserId)
+        public async Task RemoveUserFromClassGroupAsync(long classId, long userIdToRemove, long removedByUserId)
         {
             try
             {
@@ -369,7 +369,7 @@ namespace Messenger.WebApp.ServiceHelper
             }
         }
 
-        public async Task<bool> IsUserMemberOfClassGroupAsync(long userId, int classId)
+        public async Task<bool> IsUserMemberOfClassGroupAsync(long userId, long classId)
         {
             try
             {

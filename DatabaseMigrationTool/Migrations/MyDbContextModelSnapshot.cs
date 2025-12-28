@@ -408,32 +408,6 @@ namespace DatabaseMigrationTool.Migrations
                     b.ToTable("MessageFoulReport", (string)null);
                 });
 
-            modelBuilder.Entity("Messenger.Models.Models.MessagePrivate", b =>
-                {
-                    b.Property<long>("MessagePrivateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("MessagePrivateID");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("MessagePrivateId"));
-
-                    b.Property<long?>("GetterUserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("GetterUserID");
-
-                    b.Property<long>("MessageId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("MessageID");
-
-                    b.HasKey("MessagePrivateId");
-
-                    b.HasIndex("GetterUserId");
-
-                    b.HasIndex("MessageId");
-
-                    b.ToTable("MessagePrivate", (string)null);
-                });
-
             modelBuilder.Entity("Messenger.Models.Models.MessageRead", b =>
                 {
                     b.Property<long>("ReadMessageId")
@@ -476,6 +450,38 @@ namespace DatabaseMigrationTool.Migrations
                         {
                             t.HasComment("");
                         });
+                });
+
+            modelBuilder.Entity("Messenger.Models.Models.MessageRecipient", b =>
+                {
+                    b.Property<long>("MessageRecipientId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("MessageRecipientID");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("MessageRecipientId"));
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("MessageID");
+
+                    b.Property<DateTime?>("ReadDateTime")
+                        .HasColumnType("datetime");
+
+                    b.Property<long>("RecipientUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("RecipientUserID");
+
+                    b.HasKey("MessageRecipientId");
+
+                    b.HasIndex(new[] { "MessageId", "RecipientUserId" }, "IX_MessageRecipients_Message_Recipient");
+
+                    b.HasIndex(new[] { "RecipientUserId" }, "IX_MessageRecipients_RecipientUserId");
+
+                    b.ToTable("MessageRecipients", (string)null);
                 });
 
             modelBuilder.Entity("Messenger.Models.Models.MessageSaved", b =>
@@ -596,6 +602,35 @@ namespace DatabaseMigrationTool.Migrations
                         {
                             t.HasComment("نگهداری ایدی چت و پرسنل جهت اینکه پرسنل مورد نظر دسترسی به ارسال پیام در گروه و ارسال به افراد ان گروه را دارد یا خیر.\r\n");
                         });
+                });
+
+            modelBuilder.Entity("Messenger.Models.Models.PrivateChatConversation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ConversationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("User1Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("User2Id")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId")
+                        .IsUnique();
+
+                    b.HasIndex("User1Id");
+
+                    b.HasIndex("User2Id");
+
+                    b.ToTable("PrivateChatConversations");
                 });
 
             modelBuilder.Entity("Messenger.Models.Models.User", b =>
@@ -838,25 +873,6 @@ namespace DatabaseMigrationTool.Migrations
                     b.Navigation("Message");
                 });
 
-            modelBuilder.Entity("Messenger.Models.Models.MessagePrivate", b =>
-                {
-                    b.HasOne("Messenger.Models.Models.User", "GetterUser")
-                        .WithMany("MessagePrivates")
-                        .HasForeignKey("GetterUserId")
-                        .HasConstraintName("FK_MessagePrivate_Users");
-
-                    b.HasOne("Messenger.Models.Models.Message", "Message")
-                        .WithMany("MessagePrivates")
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_MessagePrivate_Messages");
-
-                    b.Navigation("GetterUser");
-
-                    b.Navigation("Message");
-                });
-
             modelBuilder.Entity("Messenger.Models.Models.MessageRead", b =>
                 {
                     b.HasOne("Messenger.Models.Models.Message", "Message")
@@ -875,6 +891,26 @@ namespace DatabaseMigrationTool.Migrations
                     b.Navigation("Message");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Messenger.Models.Models.MessageRecipient", b =>
+                {
+                    b.HasOne("Messenger.Models.Models.Message", "Message")
+                        .WithMany("MessageRecipients")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_MessageRecipients_Messages");
+
+                    b.HasOne("Messenger.Models.Models.User", "RecipientUser")
+                        .WithMany("MessageRecipients")
+                        .HasForeignKey("RecipientUserId")
+                        .IsRequired()
+                        .HasConstraintName("FK_MessageRecipients_Users");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("RecipientUser");
                 });
 
             modelBuilder.Entity("Messenger.Models.Models.MessageSaved", b =>
@@ -918,6 +954,25 @@ namespace DatabaseMigrationTool.Migrations
                         .HasConstraintName("FK_PersonelChatAccess_Users");
 
                     b.Navigation("Personel");
+                });
+
+            modelBuilder.Entity("Messenger.Models.Models.PrivateChatConversation", b =>
+                {
+                    b.HasOne("Messenger.Models.Models.User", "User1")
+                        .WithMany()
+                        .HasForeignKey("User1Id")
+                        .IsRequired()
+                        .HasConstraintName("FK_PrivateChatConversations_User1");
+
+                    b.HasOne("Messenger.Models.Models.User", "User2")
+                        .WithMany()
+                        .HasForeignKey("User2Id")
+                        .IsRequired()
+                        .HasConstraintName("FK_PrivateChatConversations_User2");
+
+                    b.Navigation("User1");
+
+                    b.Navigation("User2");
                 });
 
             modelBuilder.Entity("Messenger.Models.Models.UserClassGroup", b =>
@@ -984,9 +1039,9 @@ namespace DatabaseMigrationTool.Migrations
 
                     b.Navigation("MessageFoulReports");
 
-                    b.Navigation("MessagePrivates");
-
                     b.Navigation("MessageReads");
+
+                    b.Navigation("MessageRecipients");
 
                     b.Navigation("MessageSaveds");
 
@@ -1005,9 +1060,9 @@ namespace DatabaseMigrationTool.Migrations
 
                     b.Navigation("MessageFoulReports");
 
-                    b.Navigation("MessagePrivates");
-
                     b.Navigation("MessageReads");
+
+                    b.Navigation("MessageRecipients");
 
                     b.Navigation("MessageSaveds");
 

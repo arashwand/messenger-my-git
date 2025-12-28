@@ -16,18 +16,36 @@ window.chatSignalRHandlers = (function () {
      */
     function registerHandlers(connection, currentUser) {
 
+       
         // دریافت پیام جدید
         connection.on("ReceiveMessage", function (message) {
-            console.log("Displaying message received on handler :", message);
+            console.log("📩 ReceiveMessage handler triggered");
+            console.log("   Message details:", {
+                messageId: message.messageId,
+                groupId: message.groupId,
+                groupType: message.groupType,
+                chatKey: message.chatKey,
+                senderUserId: message.senderUserId,
+                currentUserId: currentUser,
+                activeGroupId: window.activeGroupId
+            });
+
+            // ✅ بدون چک activeGroupId - displayMessage خودش مدیریت می‌کند
             if (message.senderUserId !== currentUser) {
                 if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
                     window.chatUIRenderer.displayMessage(message);
+                } else {
+                    console.error("chatUIRenderer or displayMessage not available");
                 }
             } else if (message.isSystemMessage) {
-                console.log("-------------------message receive from portal-------------------");
+                console.log("System message received from portal");
                 if (window.chatUIRenderer && window.chatUIRenderer.displayMessage) {
                     window.chatUIRenderer.displayMessage(message);
+                } else {
+                    console.error("chatUIRenderer or displayMessage not available");
                 }
+            } else {
+                console.log("Message from self - skipping display (will be shown via MessageSentSuccessfully)");
             }
         });
 

@@ -15,6 +15,7 @@ using System.Net.Http;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 
 namespace Messenger.WebApp.Controllers
 {
@@ -29,6 +30,7 @@ namespace Messenger.WebApp.Controllers
         private readonly IRealtimeHubBridgeService _hubBridgeService;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ILogger<ChatController> _logger;
+        private readonly IUserServiceClient _userService;
         private readonly string _baseUrl;
 
         public ChatController(IRealtimeHubBridgeService hubBridgeService,
@@ -37,7 +39,8 @@ namespace Messenger.WebApp.Controllers
             IHttpContextAccessor httpContextAccessor,
             IFileManagementServiceClient fileManagementServiceClient,
             IOptions<ApiSettings> apiSettings,
-            HttpClient httpClient)
+            HttpClient httpClient,
+            IUserServiceClient userService)
         {
             _hubBridgeService = hubBridgeService;
             _logger = logger;
@@ -46,6 +49,7 @@ namespace Messenger.WebApp.Controllers
             _fileService = fileManagementServiceClient;
             _httpClient = httpClient;
             _baseUrl = apiSettings.Value.BaseUrl;
+            _userService = userService;
         }
 
         public class DownloadFileRequest { public long FileId { get; set; } }
@@ -154,9 +158,8 @@ namespace Messenger.WebApp.Controllers
         }
 
         [HttpGet("usersWithStatus")]
-        public async Task<IActionResult> GetUsersWithStatus([FromQuery] string groupId, [FromQuery] string groupType)
+        public async Task<IActionResult> GetUsersWithStatus([FromQuery] long groupId, [FromQuery] string groupType)
         {
-            if (string.IsNullOrEmpty(groupId) || string.IsNullOrEmpty(groupType)) return BadRequest("GroupId and GroupType are required.");
             try
             {
                 var users = await _hubBridgeService.GetUsersWithStatusAsync(groupId, groupType);
@@ -166,6 +169,68 @@ namespace Messenger.WebApp.Controllers
             {
                 _logger.LogError(ex, "Error in GetUsersWithStatus action.");
                 return StatusCode(500, "Internal server error getting users with status.");
+            }
+        }
+
+        [HttpGet("searchUsers")]
+        [Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
+        public async Task<IActionResult> SearchUsers([FromQuery] string query, [FromQuery] string searchType = "name")
+        {
+            try
+            {
+                // Validate input
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    return BadRequest(new { success = false, message = "متن جستجو نمیتواند خالی باشد." });
+                }
+
+                if (query.Length < 2)
+                {
+                    return BadRequest(new { success = false, message = "حداقل ۲ کاراکتر برای جستجو لازم است." });
+                }
+
+                // Validate searchType
+                if (searchType != "name" && searchType != "nationalCode")
+                {
+                    searchType = "name";
+                }
+
+                var currentUserId = GetCurrentUserId();
+                var currentUserRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+
+                _logger.LogInformation(
+                    "User {UserId} with role {Role} searching for users with query: {Query}, type: {SearchType}",
+                    currentUserId,
+                    currentUserRole,
+                    query,
+                    searchType
+                );
+
+                // Call the API to search users
+                var users = await _userService.SearchUsersAsync(query, searchType);
+
+                // Filter out the current user from results
+                var filteredUsers = users.Where(u => u.UserId != currentUserId).ToList();
+
+                _logger.LogInformation("Search completed. Found {Count} users (excluding current user).", filteredUsers.Count);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = filteredUsers,
+                    count = filteredUsers.Count,
+                    searchType = searchType
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "HTTP error occurred while searching users with query: {Query}", query);
+                return StatusCode(503, new { success = false, message = "Service temporarily unavailable." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while searching users with query: {Query}", query);
+                return StatusCode(500, new { success = false, message = "An error occurred while searching for users." });
             }
         }
 

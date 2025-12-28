@@ -16,6 +16,7 @@
   <ItemGroup>
     <Content Remove="Data\badwords.json" />
     <Content Remove="Views\Account\Login - Copy.cshtml" />
+    <Content Remove="wwwroot\js\chatHub.js" />
   </ItemGroup>
 
   <ItemGroup>

@@ -24,5 +24,10 @@ namespace Messenger.API.ServiceHelper.Interfaces
 
         Task CacheUserGroupKeysAsync(long userId, IEnumerable<string> groupKeys);
 
+        /// <summary>
+        /// دریافت تعداد کل کاربران آنلاین در تمام گروهها
+        /// </summary>
+        Task<int> GetTotalOnlineUsersCountAsync();
+
     }
 }

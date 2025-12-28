@@ -123,7 +123,7 @@ namespace Messenger.API.Controllers
         }
 
         /// <summary>
-        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران
+        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران بر اساس نقش
         /// </summary>
         [HttpPost("send-message-all-portal")]
         [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
@@ -158,6 +158,44 @@ namespace Messenger.API.Controllers
             }
         }
 
+
+        /// <summary>
+        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران
+        /// </summary>
+        [HttpPost("send-private-message-all-portal")]
+        [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
+        public async Task<IActionResult> SendMessageToAllFromPortal([FromBody] SendPrivateMessageToAllFromPortalDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest("Invalid request data.");
+
+            if (string.IsNullOrWhiteSpace(request.MessageText))
+                return BadRequest("Message text cannot be empty.");
+
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+
+            try
+            {
+                var savedMessageDto = await _broadcastService.BroadcasPrivateMessagetAsync(userId, request);
+
+                if (savedMessageDto == null)
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Failed to save message.");
+
+                return Ok(new
+                {
+                    Message = savedMessageDto.MessageText,
+                    Data = savedMessageDto.TargetIdsCount
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while sending message to MessageType {MessageType}", request.MessageType);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+            }
+        }
+
+
         [HttpGet("{messageId}")]
         public async Task<ActionResult<MessageDto>> GetMessageById(long messageId)
         {
@@ -168,22 +206,24 @@ namespace Messenger.API.Controllers
         }
 
         [HttpGet("private/{otherUserId}")]
-        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateMessages(long otherUserId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
+        public async Task<ActionResult<PrivateChatDto>> GetPrivateMessages(long otherUserId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
         {
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();
-            var messages = await _messageService.GetPrivateMessagesAsync(userId, otherUserId, pageNumber, pageSize);
+            var privateChatDto = await _messageService.GetPrivateMessagesAsync(userId, otherUserId, pageSize, messageId, loadOlder, loadBothDirections);
+            return Ok(privateChatDto);
+        }
+
+        [HttpGet("private/conversation/{conversationId}")]
+        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateMessagesByConversationId(long conversationId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
+        {
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+            var messages = await _messageService.GetPrivateChatMessagesAsync(conversationId, userId, pageSize, messageId, loadOlder, loadBothDirections);
             return Ok(messages);
         }
 
-        //[HttpGet("channel/{channelId}")]
-        //public async Task<ActionResult<IEnumerable<MessageDto>>> GetChannelMessages(int channelId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
-        //{
-        //    var userId = GetCurrentUserId();
-        //    if (userId <= 0) return Unauthorized();
-        //    var messages = await _messageService.GetChannelMessagesAsync(channelId, userId, pageNumber, pageSize);
-        //    return Ok(messages);
-        //}
+        
 
 
         /// <summary>
@@ -237,7 +277,7 @@ namespace Messenger.API.Controllers
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();
             var messages = await _messageService.GetReportedMessagesAsync(classId, chatType, userId, pageNumber, pageSize, scope);
-            return Ok(messages);
+            return Ok(messages.OrderByDescending(o=>o.MessageId));
         }
 
         [HttpGet("{messageId}/readstatus")]
@@ -455,6 +495,27 @@ namespace Messenger.API.Controllers
         //        return BadRequest(ex.Message);
         //    }
         //}
+
+        /// <summary>
+        /// Get list of private chats for the current user
+        /// </summary>
+        [HttpGet("private-chats")]
+        public async Task<ActionResult<IEnumerable<PrivateChatItemDto>>> GetPrivateChats()
+        {
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+
+            try
+            {
+                var privateChats = await _messageService.GetUserPrivateChatsAsync(userId);
+                return Ok(privateChats);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting private chats for user {UserId}", userId);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while retrieving private chats.");
+            }
+        }
     }
 }
 

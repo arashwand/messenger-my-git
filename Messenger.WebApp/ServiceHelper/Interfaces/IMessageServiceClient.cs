@@ -8,22 +8,25 @@ namespace Messenger.WebApp.ServiceHelper.Interfaces
     {
         Task<MessageDto> SendPrivateMessageAsync(long receiverUserId, string messageText, List<long>? fileAttachementIds = null, long? replyToMessageId = null);
         Task<MessageDto> SendChannelMessageAsync(long channelId, string messageText, List<long>? fileAttachementIds = null, long? replyToMessageId = null);
-        Task<MessageDto> SendClassGroupMessageAsync(int classId, string messageText, List<long>? fileAttachementIds = null, long? replyToMessageId = null);
+        Task<MessageDto> SendClassGroupMessageAsync(long classId, string messageText, List<long>? fileAttachementIds = null, long? replyToMessageId = null);
 
         //Edit
-        Task<MessageDto> EditMessageAsync(long messageId, int groupId, string groupType, string newText, List<long>? fileIds, List<long>? fileIdsToRemove);
+        Task<MessageDto> EditMessageAsync(long messageId, long groupId, string groupType, string newText, List<long>? fileIds, List<long>? fileIdsToRemove);
         //Task<MessageDto> EditChannelMessageAsync(long messageId, string newText, List<long>? fileIds, List<long>? fileIdsToRemove);
 
 
 
 
         Task<MessageDto?> GetMessageByIdAsync(long messageId);
-        Task<IEnumerable<MessageDto>> GetPrivateMessagesAsync(long userId1, long userId2, int pageNumber, int pageSize, long messageId, bool loadOlder);
-        Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(int channelId, int pageNumber, int pageSize, long messageId, bool loadOlder = false);
-        Task<IEnumerable<MessageDto>> GetChatMessagesAsync(int chatId,
+        Task<PrivateChatDto> GetPrivateMessagesAsync(long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false);
+        Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, int pageNumber, int pageSize, long messageId, bool loadOlder = false);
+        Task<IEnumerable<MessageDto>> GetChatMessagesAsync(long chatId,
         string chatType, int pageNumber, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false);
 
-        Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(int classId, string chatType, int pageSize);
+        Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(long conversationId, int pageSize,
+            long messageId = 0, bool loadOlder = false, bool loadBothDirections = false);
+
+        Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(long classId, string chatType, int pageSize);
         Task<long?> MarkMessageAsReadAsync(long messageId, long userId);
         Task<IEnumerable<MessageReadDto>> GetMessageReadStatusAsync(long messageId);
         Task PinMessageAsync(long messageId, bool isPinned);
@@ -40,8 +43,10 @@ namespace Messenger.WebApp.ServiceHelper.Interfaces
         Task<IEnumerable<MessageSavedDto>> GetSavedMessagesAsync();
         Task DeleteSavedMessageAsync(long messageSavedId);
         Task<MessageDto> SendPrivateFileMessageAsync(long senderUserId, long receiverUserId, string fileName, byte[] fileContent, string contentType, long fileSize);
-        Task<MessageDto> SendChannelFileMessageAsync(long senderUserId, int channelId, string fileName, byte[] fileContent, string contentType, long fileSize);
-        Task<MessageDto> SendClassGroupFileMessageAsync(long senderUserId, int classId, string fileName, byte[] fileContent, string contentType, long fileSize);
+        Task<MessageDto> SendChannelFileMessageAsync(long senderUserId, long channelId, string fileName, byte[] fileContent, string contentType, long fileSize);
+        Task<MessageDto> SendClassGroupFileMessageAsync(long senderUserId, long classId, string fileName, byte[] fileContent, string contentType, long fileSize);
 
+        // Private Chats & System Messages
+        Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId);
     }
 }

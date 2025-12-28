@@ -31,7 +31,7 @@ namespace Messenger.WebApp.ServiceHelper
             return await response.Content.ReadFromJsonAsync<MessageDto>();
         }
 
-        public async Task<MessageDto> SendClassGroupMessageAsync(int classId, string messageText, List<long>? fileAttachementIds = null, long? replyToMessageId = null)
+        public async Task<MessageDto> SendClassGroupMessageAsync(long classId, string messageText, List<long>? fileAttachementIds = null, long? replyToMessageId = null)
         {
             var request = new { ClassId = classId, MessageText = messageText, FileAttachementIds = fileAttachementIds, ReplyToMessageId = replyToMessageId };
             var response = await _httpClient.PostAsJsonAsync("api/messages/classgroup", request);
@@ -44,14 +44,21 @@ namespace Messenger.WebApp.ServiceHelper
             return await _httpClient.GetFromJsonAsync<MessageDto>($"api/messages/{messageId}");
         }
 
-        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesAsync(long userId1, long userId2, int pageNumber, int pageSize, long messageId, bool loadOlder)
+        public async Task<PrivateChatDto> GetPrivateMessagesAsync(long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
+        {
+            var response = await _httpClient.GetFromJsonAsync<PrivateChatDto>(
+                $"api/messages/private/{otherUserId}?pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}&loadBothDirections={loadBothDirections}");
+            return response;
+        }
+
+        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(long conversationId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<MessageDto>>(
-                $"api/messages/private?userId1={userId1}&userId2={userId2}&pageNumber={pageNumber}&pageSize={pageSize}");
+                $"api/messages/private/conversation/{conversationId}?pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}&loadBothDirections={loadBothDirections}");
             return response ?? new List<MessageDto>();
         }
 
-        public async Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(int channelId, int pageNumber, int pageSize, long messageId, bool loadOlder)
+        public async Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, int pageNumber, int pageSize, long messageId, bool loadOlder)
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<MessageDto>>(
                 $"api/messages/channel/{channelId}?pageNumber={pageNumber}&pageSize={pageSize}");
@@ -59,7 +66,7 @@ namespace Messenger.WebApp.ServiceHelper
             return response ?? new List<MessageDto>();
         }
 
-        public async Task<IEnumerable<MessageDto>> GetChatMessagesAsync(int chatId, string chatType, int pageNumber,
+        public async Task<IEnumerable<MessageDto>> GetChatMessagesAsync(long chatId, string chatType, int pageNumber,
             int pageSize, long messageId, bool loadOlder, bool loadBothDirections = false)
         {
             try
@@ -87,7 +94,7 @@ namespace Messenger.WebApp.ServiceHelper
         }
 
 
-        public async Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(int classId, string chatType, int pageSize)
+        public async Task<IEnumerable<MessageDto>> GetChatPinnedMessagesAsync(long classId, string chatType, int pageSize)
         {
             try
             {
@@ -260,7 +267,7 @@ namespace Messenger.WebApp.ServiceHelper
             return await response.Content.ReadFromJsonAsync<MessageDto>();
         }
 
-        public async Task<MessageDto> SendChannelFileMessageAsync(long senderUserId, int channelId, string fileName, byte[] fileContent, string contentType, long fileSize)
+        public async Task<MessageDto> SendChannelFileMessageAsync(long senderUserId, long channelId, string fileName, byte[] fileContent, string contentType, long fileSize)
         {
             using var content = new MultipartFormDataContent();
             content.Add(new StringContent(senderUserId.ToString()), "SenderUserId");
@@ -275,7 +282,7 @@ namespace Messenger.WebApp.ServiceHelper
             return await response.Content.ReadFromJsonAsync<MessageDto>();
         }
 
-        public async Task<MessageDto> SendClassGroupFileMessageAsync(long senderUserId, int classId, string fileName, byte[] fileContent, string contentType, long fileSize)
+        public async Task<MessageDto> SendClassGroupFileMessageAsync(long senderUserId, long classId, string fileName, byte[] fileContent, string contentType, long fileSize)
         {
             using var content = new MultipartFormDataContent();
             content.Add(new StringContent(senderUserId.ToString()), "SenderUserId");
@@ -291,7 +298,7 @@ namespace Messenger.WebApp.ServiceHelper
         }
 
         //edit
-        public async Task<MessageDto> EditMessageAsync(long messageId, int groupId, string groupType, string newText, List<long>? fileIds, List<long>? fileIdsToRemove)
+        public async Task<MessageDto> EditMessageAsync(long messageId, long groupId, string groupType, string newText, List<long>? fileIds, List<long>? fileIdsToRemove)
         {
             var request = new { MessageId = messageId, GroupId = groupId, GroupType = groupType, MessageText = newText, FileAttachementIds = fileIds, FileIdsToRemove = fileIdsToRemove };
             var response = await _httpClient.PutAsJsonAsync("api/messages/classgroup", request);
@@ -306,5 +313,21 @@ namespace Messenger.WebApp.ServiceHelper
         //    response.EnsureSuccessStatusCode();
         //    return await response.Content.ReadFromJsonAsync<MessageDto>();
         //}
+
+        // Private Chats & System Messages
+        public async Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("api/messages/private-chats");
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<IEnumerable<PrivateChatItemDto>>() ?? new List<PrivateChatItemDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching private chats for user {userId}", userId);
+                throw;
+            }
+        }
     }
 }

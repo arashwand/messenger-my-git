@@ -34,6 +34,14 @@ namespace Messenger.Services.Interfaces
         /// <param name="channelId"></param>
         /// <returns></returns>
         Task<IEnumerable<UserDto>> GetChannelMembersInternalAsync(long channelId);
+
+        /// <summary>
+        /// دریافت تعداد اعضای کانال
+        /// </summary>
+        /// <param name="channelId">شناسه کانال</param>
+        /// <returns>تعداد اعضا</returns>
+        Task<int> GetChannelMembersCountAsync(long channelId);
+
         Task<bool> IsUserMemberOfChannelAsync(long userId, long channelId);
 
         // Search (Optional)

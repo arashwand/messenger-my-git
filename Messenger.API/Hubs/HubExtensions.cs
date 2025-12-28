@@ -67,7 +67,7 @@ namespace Messenger.API.Hubs
         {
             try
             {
-                logger.LogInformation("BroadcastToGroupAndBridgeAsync: method={Method}, isBridge={IsBridge}, groupKey={GroupKey}", 
+                logger.LogInformation("BroadcastToGroupAndBridgeAsync: method={Method}, isBridge={IsBridge}, groupKey={GroupKey}",
                     groupMethod, isBridgeSender, groupKey);
 
                 // ارسال به اعضای گروه (به جز فرستنده)
@@ -83,7 +83,7 @@ namespace Messenger.API.Hubs
                     logger.LogInformation("Sending to GroupExcept({GroupKey}) excluding mobile sender", groupKey);
                     await hub.Clients.GroupExcept(groupKey, hub.Context.ConnectionId).SendAsync(groupMethod, groupArgs);
                 }
-                
+
                 // ارسال به تمام Bridge ها (اگر bridgeMethod مشخص شده باشد)
                 if (!string.IsNullOrEmpty(bridgeMethod))
                 {
@@ -105,16 +105,17 @@ namespace Messenger.API.Hubs
         {
             try
             {
-                logger.LogInformation("NotifyUserAndBridgeAsync: method={Method}, userId={UserId}, isBridge={IsBridge}", 
+                logger.LogInformation("NotifyUserAndBridgeAsync: method={Method}, userId={UserId}, isBridge={IsBridge}",
                     method, userId, isBridgeSender);
+
 
                 // ارسال به کاربر
                 logger.LogInformation("Sending to User({UserId})", userId);
-                await hub.Clients.User(userId.ToString()).SendAsync(method, args);
-                
+                 await hub.Clients.User(userId.ToString()).SendAsync(method, args);
+               // await hub.Clients.User(userId.ToString()).SendAsync(method, args[0], args[1]);
                 // ارسال به تمام Bridge ها
                 logger.LogInformation("Sending to ALL bridges: Group({BridgeGroup})", bridgeGroupName);
-                await hub.Clients.Group(bridgeGroupName).SendAsync(method, args);
+                await hub.Clients.Group(bridgeGroupName).SendAsync(method, userId, args);
             }
             catch (Exception ex)
             {
@@ -194,28 +195,51 @@ namespace Messenger.API.Hubs
         {
             try
             {
-                if (targetType == ConstChat.PrivateType)
+                string groupKey;
+
+                if (targetType == "Private" || targetType == ConstChat.PrivateType)
                 {
-                    // ارسال به کاربر خصوصی
-                    await hubContext.BroadcastToUsersAndBridgeAsync(logger, bridgeGroupName, new[] { targetId.ToString() }, "UpdatePinMessage",
-                        new object[] { messageDto, EnumMessageType.Private, new long[] { targetId } });
+                    // برای Private: محاسبه groupKey از روی sender و receiver
+                    var senderId = messageDto.SenderUserId;
+                    var receiverId = messageDto.OwnerId > 0 ? messageDto.OwnerId : targetId;
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
+
+                    messageDto.GroupType = "Private";
+                    messageDto.ChatKey = groupKey;
+                    // Note: groupId در Bridge تنظیم میشود چون برای هر کاربر متفاوت است
+
+                    logger.LogInformation($"Private message: sender={senderId}, receiver={receiverId}, groupKey={groupKey}");
                 }
                 else if (targetType == ConstChat.ClassGroupType || targetType == ConstChat.ChannelGroupType)
                 {
-                    // ارسال به گروه یا کانال
-                    var groupKey = GenerateSignalRGroupKey.GenerateKey((int)targetId, targetType);
-                    var messageType = targetType == ConstChat.ClassGroupType ? EnumMessageType.Group : EnumMessageType.Channel;
-                    await hubContext.BroadcastToGroupsAndBridgeAsync(logger, bridgeGroupName, new[] { groupKey }, "UpdatePinMessage",
-                        new object[] { messageDto, messageType, targetId });
+                    // برای Group/Channel
+                    groupKey = GenerateSignalRGroupKey.GenerateKey((int)targetId, targetType);
+                    messageDto.GroupId = targetId;
+                    messageDto.GroupType = targetType;
+                    messageDto.ChatKey = groupKey;
+
+                    logger.LogInformation($"Group message: targetId={targetId}, groupKey={groupKey}");
                 }
                 else
                 {
                     logger.LogError("Unsupported targetType {TargetType} in SendMessageToTargetAndBridgeAsync", targetType);
+                    return;
                 }
+
+                // ارسال به گروه (موبایل + وب)
+                await hubContext.Clients.Group(groupKey)
+                    .SendAsync("ReceiveMessage", messageDto);
+
+                // ارسال به Bridge (برای کلاینتهای وب)
+                await hubContext.Clients.Group(bridgeGroupName)
+                    .SendAsync("ReceiveMessage", messageDto);
+
+                logger.LogInformation($"Message sent to group {groupKey} and bridge");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "SendMessageToTargetAndBridgeAsync failed for targetType {TargetType} targetId {TargetId}", targetType, targetId);
+                logger.LogError(ex, "SendMessageToTargetAndBridgeAsync failed for targetType={Type}, targetId={Id}", targetType, targetId);
+                throw;
             }
         }
     }

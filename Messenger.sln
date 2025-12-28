@@ -19,10 +19,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messenger.WebApp", "Messeng
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatabaseMigrationTool", "DatabaseMigrationTool\DatabaseMigrationTool.csproj", "{A2CD7714-7996-4579-9A40-354947C20108}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "chatzy2", "chatzy2", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messenger.WebApp", "..\AI_develop\Messenger.WebApp\chatzy2\Messenger.WebApp.csproj", "{74BB85AE-A649-5C76-F96F-41A53179C184}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Messenger.Moderation", "Messenger.Moderation\Messenger.Moderation.csproj", "{8F501217-B236-4115-8E8A-ACE873D12531}"
 EndProject
 Global
@@ -63,10 +59,6 @@ Global
 		{A2CD7714-7996-4579-9A40-354947C20108}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A2CD7714-7996-4579-9A40-354947C20108}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A2CD7714-7996-4579-9A40-354947C20108}.Release|Any CPU.Build.0 = Release|Any CPU
-		{74BB85AE-A649-5C76-F96F-41A53179C184}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{74BB85AE-A649-5C76-F96F-41A53179C184}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{74BB85AE-A649-5C76-F96F-41A53179C184}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{74BB85AE-A649-5C76-F96F-41A53179C184}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8F501217-B236-4115-8E8A-ACE873D12531}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8F501217-B236-4115-8E8A-ACE873D12531}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F501217-B236-4115-8E8A-ACE873D12531}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -74,9 +66,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{74BB85AE-A649-5C76-F96F-41A53179C184} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AC8EDE2F-C705-4EDA-9AF8-0C0FEA958763}

@@ -166,7 +166,7 @@ namespace Messenger.WebApp.ServiceHelper
             return await response.Content.ReadFromJsonAsync<FileRenameResult>();
         }
 
-        public async Task<CountSharedContentDto> GetFileCountsForChatAsync(int chatId, string groupType)
+        public async Task<CountSharedContentDto> GetFileCountsForChatAsync(long chatId, string groupType)
         {
             if (chatId <= 0)
                 throw new ArgumentException("ایدی چت نامعتبر است", nameof(chatId));
