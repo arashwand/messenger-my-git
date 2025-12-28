@@ -98,12 +98,7 @@ namespace Messenger.API.ServiceHelper
                 }
                 else
                 {
-                    if (!long.TryParse(queuedMessage.GroupId, out var numericGroupId))
-                    {
-                        _logger.LogError("Invalid GroupId format in queued message: {GroupId}", queuedMessage.GroupId);
-                        return;
-                    }
-                    groupKey = GenerateSignalRGroupKey.GenerateKey(numericGroupId, queuedMessage.GroupType);
+                    groupKey = GenerateSignalRGroupKey.GenerateKey(queuedMessage.GroupId, queuedMessage.GroupType);
                 }
 
                 await _hubContext.Clients.Group(groupKey).SendAsync("ReceiveMessage", savedMessageDto);

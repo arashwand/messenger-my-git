@@ -300,9 +300,8 @@
                     data: { chatId: chatId, groupType: groupType, messageId: lastReadMessageId ,isNewChat: isNewChat},
                     success: function (data) {
                         $('#chat-details-panel').html(data).addClass('visible');
-                        let conversationId = $('#chatKey').val();
                         // push state so back/forward will reflect chat
-                        try { pushChatToUrl(groupType, conversationId); } catch (e) { console.error(e); }
+                        try { pushChatToUrl(groupType, chatId); } catch (e) { console.error(e); }
 
                         window.chatApp.reAttachScrollListener();
 
