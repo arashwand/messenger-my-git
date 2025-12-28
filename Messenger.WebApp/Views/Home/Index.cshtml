@@ -302,7 +302,13 @@
                         $('#chat-details-panel').html(data).addClass('visible');
                         let conversationId = $('#chatKey').val();
                         // push state so back/forward will reflect chat
-                        try { pushChatToUrl(groupType, conversationId); } catch (e) { console.error(e); }
+                        try {
+                            let urlGroupType = groupType;
+                            if (groupType.toLowerCase() === 'private') {
+                                urlGroupType = 'private';
+                            }
+                            pushChatToUrl(urlGroupType, conversationId);
+                        } catch (e) { console.error(e); }
 
                         window.chatApp.reAttachScrollListener();
 
@@ -467,30 +473,35 @@
             
             console.log('---' + chatSelectedTitle);
 
-            let selectedChatId = `${groupType}_${chatId}`;
-            window.activeGroupId = selectedChatId;
+            let signalRGroupId = `${groupType}_${chatId}`;
+            // SignalR Hub expects lowercase 'private_' for private chats.
+            if (groupType.toLowerCase() === 'private') {
+                signalRGroupId = `private_${chatId}`;
+            }
+
             if(selectedChat.length) {
                 const chatItemsBody = $('#chatContactTab');
                 const chatItems = chatItemsBody.find('.active');
-                chatItems. removeClass('active');
+                chatItems.removeClass('active');
                 selectedChat.addClass('active');
 
                 if (window.chatApp && window.chatApp.connection) {
-                    if (window.activeGroupId) {
+                    // Leave the old group if it's different from the new one
+                    if (window.activeGroupId && window.activeGroupId !== signalRGroupId) {
                         window.chatApp.connection.invoke("LeaveGroup", window.activeGroupId)
                             .catch(err => {
                                 console.error('Error leaving group:', err);
-                                window.chatUIRenderer.showToast("❌ خطا در ترک چت", "error");
                             });
                     }
-                    window.chatApp. connection.invoke("JoinGroup", selectedChatId)
+                    // Join the new group
+                    window.chatApp.connection.invoke("JoinGroup", signalRGroupId)
                         .catch(err =>{
                             console.error('Error joining group:', err);
-                            window.chatUIRenderer. showToast("❌ خطا در پیوستن به چت", "error");
+                            window.chatUIRenderer.showToast("❌ خطا در پیوستن به چت", "error");
                         });
                 }
-                window.activeGroupId = selectedChatId; // ✅ مقدار صحیح ذخیره می‌شود
-                console.log(" selcted chat and window.activeGroupId:", window.activeGroupId);
+                window.activeGroupId = signalRGroupId; // Set the new active group
+                console.log("selected chat and window.activeGroupId:", window.activeGroupId);
             }
         }
 

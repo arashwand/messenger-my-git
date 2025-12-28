@@ -161,13 +161,13 @@ namespace Messenger.WebApp.ServiceHelper
         public async Task SendTypingSignalAsync(long userId, long groupId, string groupType)
         {
             if (IsConnected)
-                await _apiHubConnection.InvokeAsync("SendTypingSignal", userId, groupId, groupType);
+                await _apiHubConnection.InvokeAsync("Typing", userId, groupId.ToString(), groupType);
         }
 
         public async Task SendStopTypingSignalAsync(long userId, long groupId, string groupType)
         {
             if (IsConnected)
-                await _apiHubConnection.InvokeAsync("SendStopTypingSignal", userId, groupId, groupType);
+                await _apiHubConnection.InvokeAsync("StopTyping", userId, groupId.ToString(), groupType);
         }
 
         public async Task MarkMessageAsReadAsync(long userId, long groupId, string groupType, long messageId)

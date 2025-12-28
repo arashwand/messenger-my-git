@@ -3,35 +3,31 @@ namespace Messenger.Tools;
 public static class PrivateChatHelper
 {
     /// <summary>
-    /// تولید کلید یکتای SignalR Group برای چت خصوصی بین دو کاربر
-    /// همیشه کوچکترین userId اول قرار میگیرد
+    /// تولید کلید یکتای SignalR Group برای چت خصوصی
     /// </summary>
-    /// <param name="userId1">شناسه کاربر اول</param>
-    /// <param name="userId2">شناسه کاربر دوم</param>
-    /// <returns>کلید به فرمت private_{min}_{max}</returns>
-    public static string GeneratePrivateChatGroupKey(long userId1, long userId2)
+    /// <param name="conversationId">شناسه مکالمه</param>
+    /// <returns>کلید به فرمت private_{conversationId}</returns>
+    public static string GeneratePrivateChatGroupKey(long conversationId)
     {
-        var minId = Math.Min(userId1, userId2);
-        var maxId = Math.Max(userId1, userId2);
-        return $"private_{minId}_{maxId}";
+        return $"private_{conversationId}";
     }
-    
+
     /// <summary>
-    /// استخراج دو userId از groupKey
+    /// استخراج شناسه مکالمه از groupKey
     /// </summary>
-    /// <param name="groupKey">کلید گروه به فرمت private_{id1}_{id2}</param>
-    /// <returns>Tuple شامل دو userId یا null در صورت خطا</returns>
-    public static (long userId1, long userId2)? ParsePrivateChatGroupKey(string groupKey)
+    /// <param name="groupKey">کلید گروه به فرمت private_{id}</param>
+    /// <returns>شناسه مکالمه یا null در صورت خطا</returns>
+    public static long? ParsePrivateChatGroupKey(string groupKey)
     {
         if (string.IsNullOrEmpty(groupKey) || !groupKey.StartsWith("private_"))
             return null;
             
         var parts = groupKey.Split('_');
-        if (parts.Length != 3) return null;
+        if (parts.Length != 2) return null;
         
-        if (long.TryParse(parts[1], out long id1) && long.TryParse(parts[2], out long id2))
+        if (long.TryParse(parts[1], out var id))
         {
-            return (id1, id2);
+            return id;
         }
         
         return null;
