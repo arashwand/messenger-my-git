@@ -160,7 +160,7 @@ namespace Messenger.API.Controllers
 
 
         /// <summary>
-        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران
+        /// ارسال پیام به لیستی از ایدی کاربران
         /// </summary>
         [HttpPost("send-private-message-all-portal")]
         [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
