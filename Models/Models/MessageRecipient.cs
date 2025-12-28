@@ -8,7 +8,7 @@ public partial class MessageRecipient
 
     public long MessageId { get; set; }
 
-    public long RecipientUserId { get; set; }
+    public long UserConversationId { get; set; }
 
     public bool IsRead { get; set; } = false;
 

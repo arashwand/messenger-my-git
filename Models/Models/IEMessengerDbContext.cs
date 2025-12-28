@@ -311,13 +311,13 @@ public partial class IEMessengerDbContext : DbContext
 
             entity.ToTable("MessageRecipients");
 
-            entity.HasIndex(e => new { e.MessageId, e.RecipientUserId }, "IX_MessageRecipients_Message_Recipient");
+            entity.HasIndex(e => new { e.MessageId, e.UserConversationId }, "IX_MessageRecipients_Message_Recipient");
 
-            entity.HasIndex(e => e.RecipientUserId, "IX_MessageRecipients_RecipientUserId");
+            entity.HasIndex(e => e.UserConversationId, "IX_MessageRecipients_RecipientUserId");
 
             entity.Property(e => e.MessageRecipientId).HasColumnName("MessageRecipientID");
             entity.Property(e => e.MessageId).HasColumnName("MessageID");
-            entity.Property(e => e.RecipientUserId).HasColumnName("RecipientUserID");
+            entity.Property(e => e.UserConversationId).HasColumnName("RecipientUserID");
             entity.Property(e => e.ReadDateTime).HasColumnType("datetime");
 
             entity.HasOne(d => d.Message).WithMany(p => p.MessageRecipients)
@@ -326,7 +326,7 @@ public partial class IEMessengerDbContext : DbContext
                 .HasConstraintName("FK_MessageRecipients_Messages");
 
             entity.HasOne(d => d.RecipientUser).WithMany(p => p.MessageRecipients)
-                .HasForeignKey(d => d.RecipientUserId)
+                .HasForeignKey(d => d.UserConversationId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_MessageRecipients_Users");
         });

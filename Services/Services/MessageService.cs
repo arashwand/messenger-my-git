@@ -88,6 +88,18 @@ namespace Messenger.Services.Services
             return resultDto;
         }
 
+
+        /// <summary>
+        /// ارسال پیام خصوصی
+        /// </summary>
+        /// <param name="senderUserId"></param>
+        /// <param name="receiverUserId"></param>
+        /// <param name="messageText"></param>
+        /// <param name="fileIds"></param>
+        /// <param name="replyToMessageId"></param>
+        /// <param name="isPortalMessage"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public async Task<MessageDto> SendPrivateMessageAsync(long senderUserId, long receiverUserId, string messageText,
             List<long>? fileIds = null, long? replyToMessageId = null, bool isPortalMessage = false)
         {
@@ -146,7 +158,7 @@ namespace Messenger.Services.Services
         /// <param name="isPortalMessage">اگه ارسال کننده پرتال بود</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, string chatId, string chatType, string messageText,
+        public async Task<MessageDto> SendGroupMessageAsync(long senderUserId, long chatId, string chatType, string messageText,
              List<long>? fileIds = null, long? replyToMessageId = null, bool isPin = false, bool isPortalMessage = false)
         {
             if (chatType == ConstChat.PrivateType)
@@ -154,12 +166,8 @@ namespace Messenger.Services.Services
                 return await SendPrivateMessageAsync(senderUserId, chatId, messageText, fileIds, replyToMessageId, isPortalMessage);
             }
 
-            if (!long.TryParse(chatId, out var numericChatId))
-            {
-                throw new ArgumentException("Invalid ChatId format for non-private chat.", nameof(chatId));
-            }
 
-            _logger.LogInformation($"Attempting to send class group message from {senderUserId} to class {numericChatId}");
+            _logger.LogInformation($"Attempting to send class group message from {senderUserId} to class {chatId}");
 
             // بررسی اینکه ارسال کننده عضو این گروه است یا خیر
             //  فعلا تا تصمیم گیری نهایی این رو معلق میکنیم
@@ -171,8 +179,8 @@ namespace Messenger.Services.Services
             //else
             //{
             hasAccess = chatType == ConstChat.ClassGroupType ?
-           await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, numericChatId)
-           : await _channelService.IsUserMemberOfChannelAsync(senderUserId, numericChatId);
+           await _classGroupService.IsUserMemberOfClassGroupAsync(senderUserId, chatId)
+           : await _channelService.IsUserMemberOfChannelAsync(senderUserId, chatId);
             //}
             // بدست اوردن نقش کاربر
             var user = await _userService.GetUserByIdAsync(senderUserId);
@@ -187,7 +195,7 @@ namespace Messenger.Services.Services
                 if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
                 {
                     var hasReceiveAnyMessageFromAdminOrPersonel = await _context.Messages.AnyAsync(m => m.OwnerId == user.UserId && 
-                        m.SenderUserId == numericChatId);
+                        m.SenderUserId == chatId);
                     if (!hasReceiveAnyMessageFromAdminOrPersonel)
                     {
                         throw new Exception("User is not a member of this class group");
@@ -215,7 +223,7 @@ namespace Messenger.Services.Services
                 // ایجاد پیام
                 var messageEntity = new Message
                 {
-                    OwnerId = numericChatId,
+                    OwnerId = chatId,
                     SenderUserId = senderUserId,
                     MessageDateTime = DateTime.UtcNow,
                     MessageType = chatTypeDetected,
@@ -282,11 +290,11 @@ namespace Messenger.Services.Services
                     MessageDateTime = messageEntity.MessageDateTime,
                     MessageType = messageEntity.MessageType,
                     ReplyMessageId = replyToMessageId,
-                    OwnerId = numericChatId,
+                    OwnerId = chatId,
                     IsSystemMessage = isPortalMessage,
                     
                     // ✅ اضافه کردن ReceiverUserId برای Private messages
-                    ReceiverUserId = (chatType == ConstChat.PrivateType) ? numericChatId : null,
+                    ReceiverUserId = (chatType == ConstChat.PrivateType) ? chatId : null,
                     
                     MessageText = messageTextEntity != null ? new MessageTextDto
                     {
@@ -2545,10 +2553,10 @@ namespace Messenger.Services.Services
                 // Check for messages sent to specific users via MessageRecipients
                 var specificUserMessages = await _context.Messages
                     .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.Private && !m.IsHidden)
-                    .Where(m => m.MessageRecipients.Any(mr => mr.RecipientUserId == userId))
+                    .Where(m => m.MessageRecipients.Any(mr => mr.UserConversationId == userId))
                     .Include(m => m.MessageTexts)
                     .Include(m => m.SenderUser)
-                    .Include(m => m.MessageRecipients.Where(mr => mr.RecipientUserId == userId))
+                    .Include(m => m.MessageRecipients.Where(mr => mr.UserConversationId == userId))
                     .OrderByDescending(m => m.MessageDateTime)
                     .ToListAsync();
                 systemMessages.AddRange(specificUserMessages);
@@ -2595,17 +2603,13 @@ namespace Messenger.Services.Services
 
         #endregion
 
-        public async Task<long> GetOtherUserIdInPrivateChat(string conversationId, long currentUserId)
+        public async Task<long> GetOtherUserIdInPrivateChat(long conversationId, long currentUserId)
         {
-            if (!long.TryParse(conversationId, out var convIdLong))
-            {
-                _logger.LogWarning("Invalid long format passed to GetOtherUserIdInPrivateChat: {ConversationId}", conversationId);
-                return 0;
-            }
+            
 
             var conversation = await _context.PrivateChatConversations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.ConversationId == convIdLong);
+                .FirstOrDefaultAsync(c => c.ConversationId == conversationId);
 
             if (conversation == null)
             {
