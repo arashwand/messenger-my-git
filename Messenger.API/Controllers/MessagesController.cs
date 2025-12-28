@@ -123,7 +123,7 @@ namespace Messenger.API.Controllers
         }
 
         /// <summary>
-        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران بر اساس نقش
+        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران
         /// </summary>
         [HttpPost("send-message-all-portal")]
         [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
@@ -158,44 +158,6 @@ namespace Messenger.API.Controllers
             }
         }
 
-
-        /// <summary>
-        /// ارسال پیام به لیستی از ایدی کاربران
-        /// </summary>
-        [HttpPost("send-private-message-all-portal")]
-        [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
-        public async Task<IActionResult> SendMessageToAllFromPortal([FromBody] SendPrivateMessageToAllFromPortalDto request)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest("Invalid request data.");
-
-            if (string.IsNullOrWhiteSpace(request.MessageText))
-                return BadRequest("Message text cannot be empty.");
-
-            var userId = GetCurrentUserId();
-            if (userId <= 0) return Unauthorized();
-
-            try
-            {
-                var savedMessageDto = await _broadcastService.BroadcasPrivateMessagetAsync(userId, request);
-
-                if (savedMessageDto == null)
-                    return StatusCode(StatusCodes.Status500InternalServerError, "Failed to save message.");
-
-                return Ok(new
-                {
-                    Message = savedMessageDto.MessageText,
-                    Data = savedMessageDto.TargetIdsCount
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error while sending message to MessageType {MessageType}", request.MessageType);
-                return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
-            }
-        }
-
-
         [HttpGet("{messageId}")]
         public async Task<ActionResult<MessageDto>> GetMessageById(long messageId)
         {
@@ -223,7 +185,14 @@ namespace Messenger.API.Controllers
             return Ok(messages);
         }
 
-        
+        //[HttpGet("channel/{channelId}")]
+        //public async Task<ActionResult<IEnumerable<MessageDto>>> GetChannelMessages(int channelId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
+        //{
+        //    var userId = GetCurrentUserId();
+        //    if (userId <= 0) return Unauthorized();
+        //    var messages = await _messageService.GetChannelMessagesAsync(channelId, userId, pageNumber, pageSize);
+        //    return Ok(messages);
+        //}
 
 
         /// <summary>
