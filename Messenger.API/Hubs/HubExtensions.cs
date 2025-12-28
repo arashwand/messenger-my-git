@@ -199,16 +199,14 @@ namespace Messenger.API.Hubs
 
                 if (targetType == "Private" || targetType == ConstChat.PrivateType)
                 {
-                    // برای Private: محاسبه groupKey از روی sender و receiver
-                    var senderId = messageDto.SenderUserId;
-                    var receiverId = messageDto.OwnerId > 0 ? messageDto.OwnerId : targetId;
-                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderId, receiverId);
+                    // برای Private: محاسبه groupKey از روی conversationId
+                    var conversationId = messageDto.GroupId;
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
 
                     messageDto.GroupType = "Private";
                     messageDto.ChatKey = groupKey;
-                    // Note: groupId در Bridge تنظیم میشود چون برای هر کاربر متفاوت است
 
-                    logger.LogInformation($"Private message: sender={senderId}, receiver={receiverId}, groupKey={groupKey}");
+                    logger.LogInformation($"Private message: conversationId={conversationId}, groupKey={groupKey}");
                 }
                 else if (targetType == ConstChat.ClassGroupType || targetType == ConstChat.ChannelGroupType)
                 {

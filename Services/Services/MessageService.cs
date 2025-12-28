@@ -66,6 +66,7 @@ namespace Messenger.Services.Services
             }
 
             var conversation = await _context.PrivateChatConversations
+                .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.ConversationId == convIdLong);
 
             if (conversation == null)
@@ -82,8 +83,7 @@ namespace Messenger.Services.Services
 
             var resultDto = await SendPrivateMessageAsync(senderUserId, receiverUserId, messageText, fileIds, replyToMessageId, isPortalMessage);
 
-            // The hub needs the receiver's ID to construct the signalR group name
-            resultDto.GroupId = receiverUserId;
+            resultDto.GroupId = conversation.ConversationId;
 
             return resultDto;
         }
@@ -91,18 +91,15 @@ namespace Messenger.Services.Services
         public async Task<MessageDto> SendPrivateMessageAsync(long senderUserId, long receiverUserId, string messageText,
             List<long>? fileIds = null, long? replyToMessageId = null, bool isPortalMessage = false)
         {
-            //TODO : تکمیل بخش ذخیره فایل ها
-            Console.WriteLine($"Attempting to send private message from {senderUserId} to {receiverUserId}");
-            // 1. بررسی وجود ارسال کننده و دریافت کننده
             var sender = await _userService.GetUserByIdAsync(senderUserId);
             var receiver = await _userService.GetUserByIdAsync(receiverUserId);
-            if (sender == null || receiver == null) throw new Exception("User not found");
+            if (sender == null || receiver == null) throw new KeyNotFoundException("User not found");
 
+            var conversation = await GetOrCreatePrivateConversationAsync(senderUserId, receiverUserId);
 
-            // 2. Create Message entity
             var messageEntity = new Message
             {
-                OwnerId = receiverUserId, // For private messages, OwnerId is receiverUserId
+                OwnerId = conversation.ConversationId,
                 SenderUserId = senderUserId,
                 MessageDateTime = DateTime.UtcNow,
                 MessageType = (byte)EnumMessageType.Private,
@@ -110,26 +107,26 @@ namespace Messenger.Services.Services
                 IsSystemMessage = isPortalMessage
             };
             _context.Messages.Add(messageEntity);
+            await _context.SaveChangesAsync();
 
-            // 3. Create MessageText entity
             var messageTextEntity = new MessageText
             {
-                MessageId = messageEntity.MessageId, // After saving messageEntity
+                MessageId = messageEntity.MessageId,
                 MessageTxt = messageText
             };
             _context.MessageTexts.Add(messageTextEntity);
 
             await _context.SaveChangesAsync();
 
-            // Map to DTO and return
             return new MessageDto
             {
                 MessageId = messageEntity.MessageId,
                 SenderUserId = senderUserId,
                 MessageDateTime = messageEntity.MessageDateTime,
                 MessageType = messageEntity.MessageType,
-                ReceiverUserId = receiverUserId
-                //MessageText = messageTextEntity.MessageTxt
+                ReceiverUserId = receiverUserId,
+                GroupId = conversation.ConversationId,
+                OwnerId = conversation.ConversationId
             };
         }
 
@@ -2633,6 +2630,27 @@ namespace Messenger.Services.Services
                 // Ensure the number is positive and fits within a safe range for JavaScript
                 return Math.Abs(random % 9007199254740991L);
             }
+        }
+
+        private async Task<PrivateChatConversation> GetOrCreatePrivateConversationAsync(long user1Id, long user2Id)
+        {
+            var conversation = await _context.PrivateChatConversations
+                .FirstOrDefaultAsync(c => (c.User1Id == user1Id && c.User2Id == user2Id) || (c.User1Id == user2Id && c.User2Id == user1Id));
+
+            if (conversation == null)
+            {
+                conversation = new PrivateChatConversation
+                {
+                    ConversationId = GenerateSecureRandomLong(),
+                    User1Id = user1Id,
+                    User2Id = user2Id,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.PrivateChatConversations.Add(conversation);
+                await _context.SaveChangesAsync();
+            }
+
+            return conversation;
         }
     }
 }

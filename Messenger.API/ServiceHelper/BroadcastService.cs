@@ -527,7 +527,7 @@ namespace Messenger.API.ServiceHelper
         /// </summary>
         public async Task SendPrivateMessageBroadcastAsync(MessageDto messageDto, long senderUserId, long receiverUserId)
         {
-            var privateChatGroupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(senderUserId, receiverUserId);
+            var privateChatGroupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(messageDto.GroupId);
             
             // تنظیم metadata
             messageDto.GroupType = "Private";

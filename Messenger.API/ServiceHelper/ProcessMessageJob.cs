@@ -93,8 +93,12 @@ namespace Messenger.API.ServiceHelper
                 string groupKey;
                 if (queuedMessage.GroupType == ConstChat.PrivateType)
                 {
-                    long receiverId = savedMessageDto.GroupId;
-                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(queuedMessage.UserId, receiverId);
+                    if (!long.TryParse(queuedMessage.GroupId, out var conversationId))
+                    {
+                        _logger.LogError("Invalid ConversationId format in queued message: {ConversationId}", queuedMessage.GroupId);
+                        return;
+                    }
+                    groupKey = PrivateChatHelper.GeneratePrivateChatGroupKey(conversationId);
                 }
                 else
                 {
