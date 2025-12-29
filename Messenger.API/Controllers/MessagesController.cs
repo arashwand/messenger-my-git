@@ -216,7 +216,7 @@ namespace Messenger.API.Controllers
         }
 
         [HttpGet("private/conversation/{conversationId}")]
-        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateMessagesByConversationId(long conversationId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
+        public async Task<ActionResult<PrivateChatDto>> GetPrivateMessagesByConversationId(long conversationId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
         {
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();

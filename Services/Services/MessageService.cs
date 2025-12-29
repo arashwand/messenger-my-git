@@ -28,12 +28,13 @@ namespace Messenger.Services.Services
         private readonly IRedisUnreadManage _redisUnreadManage;
         private readonly IPersonnelChatAccessService _personnelChatAccessService;
         private readonly TimeSettingOptions _timeSettings;
+        private readonly AccountSetting _accountSettings;
 
         // Constructor injection for dependencies
         public MessageService(IEMessengerDbContext context, IUserService userService,
             IChannelService channelService, IClassGroupService classGroupService,
             ILogger<MessageService> logger, IFileManagementService fileManagementService, IRedisUnreadManage redisUnreadManage,
-            IPersonnelChatAccessService personnelChatAccessService, IOptions<TimeSettingOptions> timeSettings)
+            IPersonnelChatAccessService personnelChatAccessService, IOptions<TimeSettingOptions> timeSettings, IOptions<AccountSetting> accountSettings)
         {
             _context = context;
             //_fileService = fileService;
@@ -45,6 +46,7 @@ namespace Messenger.Services.Services
             _redisUnreadManage = redisUnreadManage;
             _personnelChatAccessService = personnelChatAccessService;
             _timeSettings = timeSettings.Value;
+            _accountSettings = accountSettings.Value;
         }
 
 
@@ -78,6 +80,11 @@ namespace Messenger.Services.Services
                 throw new UnauthorizedAccessException("Sender is not a participant in this conversation.");
             }
 
+            if (conversation.User1Id == _accountSettings.SystemId)
+            {
+
+            }
+
             long receiverUserId = (senderUserId == conversation.User1Id) ? conversation.User2Id : conversation.User1Id;
 
             var resultDto = await SendPrivateMessageAsync(senderUserId, receiverUserId, messageText, fileIds, replyToMessageId, isPortalMessage);
@@ -109,6 +116,7 @@ namespace Messenger.Services.Services
             var sender = await _userService.GetUserByIdAsync(senderUserId);
             var receiver = await _userService.GetUserByIdAsync(receiverUserId);
             if (sender == null || receiver == null) throw new Exception("User not found");
+
 
 
             // 2. Create Message entity
@@ -186,7 +194,7 @@ namespace Messenger.Services.Services
             var user = await _userService.GetUserByIdAsync(senderUserId);
 
             if (!hasAccess)
-            {               
+            {
                 if (user == null)
                 {
                     throw new Exception("User is not a member of this class group");
@@ -194,7 +202,7 @@ namespace Messenger.Services.Services
                 // اگر نقش ادمین یا پرسنل بود اجازه ارسال پیام بده
                 if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
                 {
-                    var hasReceiveAnyMessageFromAdminOrPersonel = await _context.Messages.AnyAsync(m => m.OwnerId == user.UserId && 
+                    var hasReceiveAnyMessageFromAdminOrPersonel = await _context.Messages.AnyAsync(m => m.OwnerId == user.UserId &&
                         m.SenderUserId == chatId);
                     if (!hasReceiveAnyMessageFromAdminOrPersonel)
                     {
@@ -202,7 +210,7 @@ namespace Messenger.Services.Services
                     }
                     else
                     {
-                     // یعنی قبلا از مدیر یا ادمین پیام دریافت کرده است   
+                        // یعنی قبلا از مدیر یا ادمین پیام دریافت کرده است   
                     }
                 }
             }
@@ -292,10 +300,10 @@ namespace Messenger.Services.Services
                     ReplyMessageId = replyToMessageId,
                     OwnerId = chatId,
                     IsSystemMessage = isPortalMessage,
-                    
+
                     // ✅ اضافه کردن ReceiverUserId برای Private messages
                     ReceiverUserId = (chatType == ConstChat.PrivateType) ? chatId : null,
-                    
+
                     MessageText = messageTextEntity != null ? new MessageTextDto
                     {
                         MessageTextId = messageTextEntity.MessageTextId,
@@ -366,7 +374,8 @@ namespace Messenger.Services.Services
                 // ایجاد پیام
                 var messageEntity = new Message
                 {
-                    SenderUserId = 100,
+                    SenderUserId = senderUserId,
+                    OwnerId = senderUserId,
                     MessageDateTime = DateTime.UtcNow,
                     MessageType = (byte)messageType,
                     IsPin = isPin,
@@ -659,42 +668,6 @@ namespace Messenger.Services.Services
             };
         }
 
-        /// <summary>
-        /// بررسی برای ایجاد چت زمانی که سرچ انجام شد
-        /// </summary>
-        /// <param name="userId1">Sender</param>
-        /// <param name="userId2">Getter</param>
-        /// <param name="pageNumber"></param>
-        /// <param name="pageSize"></param>
-        /// <returns></returns>
-        public async Task<PrivateChatDto> GetPrivateMessagesAsync(long currentUserId, long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
-        {
-            _logger.LogInformation($"Getting private messages between {currentUserId} and {otherUserId}.");
-
-            var conversation = await _context.PrivateChatConversations
-                .FirstOrDefaultAsync(c => (c.User1Id == currentUserId && c.User2Id == otherUserId) || (c.User1Id == otherUserId && c.User2Id == currentUserId));
-
-            if (conversation == null)
-            {
-                conversation = new PrivateChatConversation
-                {
-                    ConversationId = GenerateSecureRandomLong(),
-                    User1Id = currentUserId,
-                    User2Id = otherUserId
-                };
-                _context.PrivateChatConversations.Add(conversation);
-                await _context.SaveChangesAsync();
-            }
-
-            // The internal method uses pageNumber for initial load calculation which we don't need here, so passing 1.
-            var messages = await GetChatMessagesInternal(otherUserId, ConstChat.PrivateType, currentUserId, 1, pageSize, messageId, loadOlder, loadBothDirections);
-
-            return new PrivateChatDto
-            {
-                ConversationId = conversation.ConversationId,
-                Messages = messages
-            };
-        }
 
         public async Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, long currentUserId, int pageNumber, int pageSize) // Added currentUserId
         {
@@ -802,11 +775,53 @@ namespace Messenger.Services.Services
             // This method is now only for group and channel chats
             if (chatType == ConstChat.PrivateType)
             {
-                return await GetPrivateChatMessagesAsync(chatId, currentUserId, pageSize, messageId, loadOlder, loadBothDirections);
+                var privateChat = await GetPrivateChatMessagesAsync(chatId, currentUserId, pageSize, messageId, loadOlder, loadBothDirections);
+                return privateChat.Messages;
             }
-            return await GetChatMessagesInternal(chatId, chatType, currentUserId, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
+            return await GetChatMessagesInternal2(chatId, chatType, currentUserId, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
         }
 
+
+        #region private chat  
+
+        /// <summary>
+        /// بررسی برای ایجاد چت زمانی که سرچ انجام شد
+        /// </summary>
+        /// <param name="userId1">Sender</param>
+        /// <param name="userId2">Getter</param>
+        /// <param name="pageNumber"></param>
+        /// <param name="pageSize"></param>
+        /// <returns></returns>
+        public async Task<PrivateChatDto> GetPrivateMessagesAsync(long currentUserId, long otherUserId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
+        {
+            _logger.LogInformation($"Getting private messages between {currentUserId} and {otherUserId}.");
+
+            var conversation = await _context.PrivateChatConversations
+                .FirstOrDefaultAsync(c => (c.User1Id == currentUserId && c.User2Id == otherUserId) || (c.User1Id == otherUserId && c.User2Id == currentUserId));
+
+            if (conversation == null)
+            {
+                conversation = new PrivateChatConversation
+                {
+                    ConversationId = GenerateSecureRandomLong(),
+                    User1Id = currentUserId,
+                    User2Id = otherUserId
+                };
+                _context.PrivateChatConversations.Add(conversation);
+                await _context.SaveChangesAsync();
+            }
+
+            // The internal method uses pageNumber for initial load calculation which we don't need here, so passing 1.
+            var messages = await GetChatMessagesInternal2(conversation.ConversationId, ConstChat.PrivateType, currentUserId, 1, pageSize, messageId, loadOlder, loadBothDirections);
+
+            return new PrivateChatDto
+            {
+                ConversationId = conversation.ConversationId,
+                Messages = messages,
+                IsSystemChat = conversation.User1Id == _accountSettings.SystemId || conversation.User2Id == _accountSettings.SystemId,
+
+            };
+        }
 
         /// <summary>
         /// دریافت پیامهای چت دونفره
@@ -818,7 +833,7 @@ namespace Messenger.Services.Services
         /// <param name="loadOlder"></param>
         /// <param name="loadBothDirections"></param>
         /// <returns></returns>
-        public async Task<IEnumerable<MessageDto>> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false)
+        public async Task<PrivateChatDto> GetPrivateChatMessagesAsync(long conversationId, long currentUserId, int pageSize, long messageId, bool loadOlder = false, bool loadBothDirections = false)
         {
             var conversation = await _context.PrivateChatConversations
                 .FirstOrDefaultAsync(c => c.ConversationId == conversationId);
@@ -826,18 +841,184 @@ namespace Messenger.Services.Services
             if (conversation == null)
             {
                 _logger.LogWarning($"Conversation not found for ID: {conversationId}");
-                return new List<MessageDto>();
+                return new PrivateChatDto();
             }
 
             if (conversation.User1Id != currentUserId && conversation.User2Id != currentUserId)
             {
                 _logger.LogWarning($"User {currentUserId} does not have access to conversation {conversationId}");
-                return new List<MessageDto>();
+                return new PrivateChatDto();
             }
 
-            long targetId = conversation.User1Id == currentUserId ? conversation.User2Id : conversation.User1Id;
-            return await GetChatMessagesInternal(targetId, ConstChat.PrivateType, currentUserId, 1, pageSize, messageId, loadOlder, loadBothDirections);
+            //اگه یکی از ایدیها متعلق به  ایدی پیام انبوه سیستم بود باید از جدول گیرندگان 
+            // و ارتباط ان باجدول پیامها خوانده شود
+            // به همین دلیل باید ایدی رکورد چت بین کاربر و ایدی سیستم را ارسال کنیم نه conversationId
+            if (conversation.User1Id == _accountSettings.SystemId || conversation.User2Id == _accountSettings.SystemId)
+            {
+                var messages = await GetChatMessagesInternal2(conversation.Id, ConstChat.PrivateType, currentUserId, 1, pageSize, messageId, loadOlder, loadBothDirections);
+                return new PrivateChatDto
+                {
+                    ConversationId = conversation.ConversationId,
+                    Messages = messages,
+                    IsSystemChat = conversation.User1Id == _accountSettings.SystemId || conversation.User2Id == _accountSettings.SystemId,
+
+                };
+
+            }
+            else
+            {
+                var messages = await GetChatMessagesInternal2(conversationId, ConstChat.PrivateType, currentUserId, 1, pageSize, messageId, loadOlder, loadBothDirections);
+                return new PrivateChatDto
+                {
+                    ConversationId = conversation.ConversationId,
+                    Messages = messages,
+                    IsSystemChat = conversation.User1Id == _accountSettings.SystemId || conversation.User2Id == _accountSettings.SystemId,
+                };
+
+            }
+
         }
+
+        private async Task<IEnumerable<MessageDto>> GetChatMessagesInternal2(long chatId,
+            string chatType, long currentUserId, int pageNumber, int pageSize,
+            long messageId, bool loadOlder = false, bool loadBothDirections = false)
+        {
+            try
+            {
+                // Access check (skip for Private since access is checked in caller)
+                if (chatType != ConstChat.PrivateType)
+                {
+                    var hasAccess = chatType == ConstChat.ClassGroupType ?
+                        await _classGroupService.IsUserMemberOfClassGroupAsync(currentUserId, chatId)
+                        : await _channelService.IsUserMemberOfChannelAsync(currentUserId, chatId);
+
+                    if (!hasAccess)
+                    {
+                        _logger.LogWarning($"User {currentUserId} does not have access to chat {chatId}");
+                        return new List<MessageDto>();
+                    }
+                }
+
+                _logger.LogInformation($"Getting messages for chat {chatId} (type: {chatType}) for user {currentUserId}");
+
+                var chatEnumType = chatType switch
+                {
+                    ConstChat.ClassGroupType => EnumMessageType.Group,
+                    ConstChat.ChannelGroupType => EnumMessageType.Channel,
+                    ConstChat.PrivateType => EnumMessageType.Private,
+                    _ => throw new ArgumentException($"Unsupported chat type: {chatType}")
+                };
+
+                // For Private chats, chatId is the conversationId
+                var baseQuery = chatType == ConstChat.PrivateType
+                    ? GetMessagesQueryForPrivate(chatId, currentUserId) // Updated for private with bulk
+                    : GetMessagesQuery(chatId, chatEnumType);
+
+                if (baseQuery == null)
+                    return new List<MessageDto>();
+
+                // Case 1: Load messages around a target (for pinned messages)
+                if (loadBothDirections && messageId > 0)
+                {
+                    var test = await baseQuery.OrderByDescending(o => o.MessageId).Where(w => w.MessageId >= messageId).ToListAsync();
+
+                    var beforeMessages = await baseQuery
+                        .OrderByDescending(m => m.MessageId)
+                        .Where(m => m.MessageId < messageId)
+                        .Take(25)
+                        .ToListAsync();
+
+                    var afterMessages = await baseQuery
+                        .OrderBy(m => m.MessageId)
+                        .Where(m => m.MessageId >= messageId)
+                        .Take(20)
+                        .ToListAsync();
+
+                    var combined = beforeMessages.Concat(afterMessages).OrderBy(m => m.MessageId).ToList();
+                    return MapMessagesToDto(combined, currentUserId);
+                }
+
+                // Case 2: Load older messages
+                if (loadOlder && messageId > 0)
+                {
+                    var olderMessages = await baseQuery
+                        .Where(m => m.MessageId < messageId)
+                        .OrderByDescending(m => m.MessageId)
+                        .Take(pageSize)
+                        .ToListAsync();
+                    return MapMessagesToDto(olderMessages.OrderBy(m => m.MessageId).ToList(), currentUserId);
+                }
+
+                // Case 3: Load newer messages
+                if (!loadOlder && messageId > 0)
+                {
+                    var newerMessages = await baseQuery
+                        .Where(m => m.MessageId > messageId)
+                        .OrderBy(m => m.MessageId)
+                        .Take(pageSize)
+                        .ToListAsync();
+                    return MapMessagesToDto(newerMessages, currentUserId);
+                }
+
+                // Case 4: Initial load
+                long lastReadMessageId = await _redisUnreadManage.GetLastReadMessageIdAsync(currentUserId, chatId, chatType);
+                if (chatType == ConstChat.ChannelGroupType)
+                {
+                    lastReadMessageId = 0;
+                }
+
+                if (lastReadMessageId > 0)
+                {
+                    var beforeMessages = await baseQuery
+                        .OrderByDescending(m => m.MessageId)
+                        .Where(m => m.MessageId < lastReadMessageId)
+                        .Take(30)
+                        .ToListAsync();
+
+                    var afterMessages = await baseQuery
+                        .OrderByDescending(m => m.MessageId)
+                        .Where(m => m.MessageId >= lastReadMessageId)
+                        .Take(20)
+                        .ToListAsync();
+
+                    var combined = beforeMessages.Concat(afterMessages).OrderBy(m => m.MessageId).ToList();
+                    return MapMessagesToDto(combined, currentUserId);
+                }
+
+                // Default: Load recent messages
+                var recentMessages = await baseQuery
+                    .OrderByDescending(m => m.MessageId)
+                    .Take(50)
+                    .ToListAsync();
+                return MapMessagesToDto(recentMessages.OrderBy(m => m.MessageId).ToList(), currentUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetChatMessagesInternal for chatId {chatId}, userId {userId}", chatId, currentUserId);
+                throw;
+            }
+        }
+
+        // New helper for private messages including bulk
+        // Updated helper for private messages including bulk
+        private IQueryable<Message> GetMessagesQueryForPrivate(long conversationId, long currentUserId)
+        {
+            return _context.Messages
+                .AsNoTracking()
+                .Where(m => m.MessageType == (byte)EnumMessageType.Private &&
+                            !m.IsHidden &&
+                            (m.OwnerId == conversationId || // Private messages
+                             (m.OwnerId == _accountSettings.SystemId && m.MessageRecipients.Any(mr => mr.UserConversationId == conversationId)))) // Bulk messages
+                .Include(m => m.MessageTexts)
+                .Include(m => m.SenderUser)
+                .Include(m => m.ReplyMessage).ThenInclude(r => r.MessageTexts)
+                .Include(m => m.ReplyMessage).ThenInclude(r => r.SenderUser)
+                .Include(m => m.MessageFiles).ThenInclude(f => f.FileExtension)
+                .Include(m => m.MessageReads)
+                .Include(repo => repo.MessageFoulReports);
+        }
+
+        #endregion
 
         private async Task<IEnumerable<MessageDto>> GetChatMessagesInternal(long chatId,
             string chatType, long currentUserId, int pageNumber, int pageSize,
@@ -869,7 +1050,7 @@ namespace Messenger.Services.Services
                     _ => throw new ArgumentException($"Unsupported chat type: {chatType}")
                 };
 
-                // For Private chats, chatId is the other user's ID, so pass currentUserId as well
+                // For Private chats, chatId is the conversationId in privateConversationChat
                 var baseQuery = chatType == ConstChat.PrivateType
                     ? GetMessagesQuery(chatId, chatEnumType, currentUserId)
                     : GetMessagesQuery(chatId, chatEnumType);
@@ -1208,8 +1389,8 @@ namespace Messenger.Services.Services
 
                 EnumMessageType.Private => _context.Messages
                     .AsNoTracking()
-                    .Where(m => m.MessageType == (byte)EnumMessageType.Private && 
-                        !m.IsHidden && 
+                    .Where(m => m.MessageType == (byte)EnumMessageType.Private &&
+                        !m.IsHidden &&
                         !m.IsSystemMessage &&
                         currentUserId.HasValue &&
                         ((m.SenderUserId == currentUserId.Value && m.OwnerId == targetId) ||
@@ -2424,7 +2605,6 @@ namespace Messenger.Services.Services
         }
 
 
-
         #endregion
 
 
@@ -2432,7 +2612,7 @@ namespace Messenger.Services.Services
 
         /// <summary>
         /// دریافت چتهای خصوصی کاربر
-        /// شامل پیامهای دونفره و پیامهای سیستم
+        /// شامل پیامهای دونفره و پیامهای سیستمی
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
@@ -2449,54 +2629,63 @@ namespace Messenger.Services.Services
 
                 var privateChats = new List<PrivateChatItemDto>();
 
-                // 1. Get regular private messages (one-to-one)
-                var regularPrivateMessages = await _context.Messages
-                    .Where(m => m.MessageType == (byte)EnumMessageType.Private  && !m.IsHidden)
-                    .Where(m => m.SenderUserId == userId || m.OwnerId == userId)
-                    .Include(m => m.MessageTexts)
-                    .Include(m => m.SenderUser)
-                    .OrderByDescending(m => m.MessageDateTime)
+                // Get all conversations for the user
+                var conversations = await _context.PrivateChatConversations
+                    .Where(c => c.User1Id == userId || c.User2Id == userId)
                     .ToListAsync();
 
-                // Group by other user (using OwnerId/SenderUserId)
-                var groupedByOtherUser = regularPrivateMessages
-                    .GroupBy(m => m.SenderUserId == userId ? m.OwnerId : m.SenderUserId)
-                    .Where(g => g.Key > 0)
-                    .Select(g => new
-                    {
-                        OtherUserId = g.Key,
-                        LastMessage = g.OrderByDescending(x => x.MessageDateTime).First()
-                    })
-                    .ToList();
-
-                foreach (var chat in groupedByOtherUser)
+                foreach (var conversation in conversations)
                 {
-                    var otherUser = await _context.Users.FindAsync(chat.OtherUserId);
+                    long otherUserId = conversation.User1Id == userId ? conversation.User2Id : conversation.User1Id;
+                    var otherUser = await _context.Users.FindAsync(otherUserId);
                     if (otherUser == null) continue;
 
-                    // Count unread messages (messages sent by other user to current user)
-                    var unreadCount = await _context.Messages
-                        .Where(m => 
-                            m.SenderUserId == chat.OtherUserId &&
-                            m.OwnerId == userId &&
-                            m.MessageType == (byte)EnumMessageType.Private &&
-                            !m.MessageReads.Any(mr => mr.UserId == userId))
+                    // Get the last message for this conversation
+                    // 1. Private messages: OwnerId == conversationId
+                    var privateMessages = await _context.Messages
+                        .Where(m => m.MessageType == (byte)EnumMessageType.Private && !m.IsHidden &&
+                                    m.OwnerId == conversation.ConversationId)
+                        .Include(m => m.MessageTexts)
+                        .Include(m => m.SenderUser)
+                        .ToListAsync();
+
+                    // 2. Bulk messages: via MessageRecipient where UserConversationId == conversationId
+                    var bulkMessages = await _context.MessageRecipients
+                        .Where(mr => mr.UserConversationId == conversation.Id &&
+                                     mr.Message.MessageType == (byte)EnumMessageType.Private &&
+                                     !mr.Message.IsHidden)
+                        .Include(mr => mr.Message.MessageTexts)
+                        .Include(mr => mr.Message.SenderUser)
+                        .Select(mr => mr.Message)
+                        .ToListAsync();
+
+                    // Combine and get the last message
+                    var allMessages = privateMessages.Concat(bulkMessages)
+                        .OrderByDescending(m => m.MessageDateTime)
+                        .ToList();
+
+                    var lastMessage = allMessages.FirstOrDefault();
+                    if (lastMessage == null) continue; // Skip if no messages yet
+
+                    #region  Count unread messages
+                    // For private: messages sent by other user, OwnerId == conversationId, not read in MessageReads
+                    var unreadPrivateCount = await _context.Messages
+                        .Where(m => m.SenderUserId == otherUserId &&
+                                    m.OwnerId == conversation.ConversationId &&
+                                    m.MessageType == (byte)EnumMessageType.Private &&
+                                    !m.MessageReads.Any(mr => mr.UserId == userId))
                         .CountAsync();
 
-                    var conversation = await _context.PrivateChatConversations
-                        .FirstOrDefaultAsync(c => (c.User1Id == userId && c.User2Id == chat.OtherUserId) || (c.User1Id == chat.OtherUserId && c.User2Id == userId));
+                    // For bulk: messages in MessageRecipient where UserConversationId == conversationId, IsRead == false
+                    var unreadBulkCount = await _context.MessageRecipients
+                        .Where(mr => mr.UserConversationId == conversation.ConversationId &&
+                                     mr.Message.SenderUserId == _accountSettings.SystemId &&
+                                     !mr.IsRead)
+                        .CountAsync();
 
-                    if (conversation == null)
-                    {
-                        conversation = new PrivateChatConversation
-                        {
-                            ConversationId = GenerateSecureRandomLong(),
-                            User1Id = userId,
-                            User2Id = chat.OtherUserId
-                        };
-                        _context.PrivateChatConversations.Add(conversation);
-                        await _context.SaveChangesAsync();
-                    }
+                    var totalUnreadCount = unreadPrivateCount + unreadBulkCount;
+
+                    #endregion End Count unread messages
 
                     privateChats.Add(new PrivateChatItemDto
                     {
@@ -2506,96 +2695,16 @@ namespace Messenger.Services.Services
                         ProfilePicName = otherUser.ProfilePicName,
                         LastMessage = new ChatMessageDto
                         {
-                            MessageId = chat.LastMessage.MessageId,
-                            Text = chat.LastMessage.MessageTexts.FirstOrDefault()?.MessageTxt,
-                            SenderId = chat.LastMessage.SenderUserId,
-                            SenderName = chat.LastMessage.SenderUser?.NameFamily,
-                            SentAt = chat.LastMessage.MessageDateTime
+                            MessageId = lastMessage.MessageId,
+                            Text = lastMessage.MessageTexts.FirstOrDefault()?.MessageTxt,
+                            SenderId = lastMessage.SenderUserId,
+                            SenderName = lastMessage.SenderUser?.NameFamily,
+                            SentAt = lastMessage.MessageDateTime
                         },
-                        UnreadCount = unreadCount,
-                        IsSystemChat = false,
-                        OtherUserId = chat.OtherUserId,
-                        LastMessageDateTime = chat.LastMessage.MessageDateTime
-                    });
-                }
-
-                // 2. Get system messages based on user role
-                var systemMessages = new List<Message>();
-
-                // Check for messages sent to all students
-                if (user.RoleName == ConstRoles.Student)
-                {
-                    var allStudentsMessages = await _context.Messages
-                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.AllStudents && !m.IsHidden)
-                        .Include(m => m.MessageTexts)
-                        .Include(m => m.SenderUser)
-                        .OrderByDescending(m => m.MessageDateTime)
-                        .ToListAsync();
-                    systemMessages.AddRange(allStudentsMessages);
-                }
-
-                // Check for messages sent to all teachers
-                if (user.RoleName == ConstRoles.Teacher)
-                {
-                    var allTeachersMessages = await _context.Messages
-                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.AllTeachers && !m.IsHidden)
-                        .Include(m => m.MessageTexts)
-                        .Include(m => m.SenderUser)
-                        .OrderByDescending(m => m.MessageDateTime)
-                        .ToListAsync();
-                    systemMessages.AddRange(allTeachersMessages);
-                }
-
-                // Check for messages sent to all personnel
-                if (user.RoleName == ConstRoles.Personel)
-                {
-                    var allPersonnelMessages = await _context.Messages
-                        .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.AllPersonel && !m.IsHidden)
-                        .Include(m => m.MessageTexts)
-                        .Include(m => m.SenderUser)
-                        .OrderByDescending(m => m.MessageDateTime)
-                        .ToListAsync();
-                    systemMessages.AddRange(allPersonnelMessages);
-                }
-
-                // Check for messages sent to specific users via MessageRecipients
-                var specificUserMessages = await _context.Messages
-                    .Where(m => m.IsSystemMessage && m.MessageType == (byte)EnumMessageType.Private && !m.IsHidden)
-                    .Where(m => m.MessageRecipients.Any(mr => mr.UserConversationId == userId))
-                    .Include(m => m.MessageTexts)
-                    .Include(m => m.SenderUser)
-                    .Include(m => m.MessageRecipients.Where(mr => mr.UserConversationId == userId))
-                    .OrderByDescending(m => m.MessageDateTime)
-                    .ToListAsync();
-                systemMessages.AddRange(specificUserMessages);
-
-                // Add system chat if there are system messages
-                if (systemMessages.Any())
-                {
-                    var lastSystemMessage = systemMessages.OrderByDescending(m => m.MessageDateTime).First();
-                    
-                    // Count unread system messages
-                    var unreadSystemCount = systemMessages.Count(m => 
-                        !m.MessageReads.Any(mr => mr.UserId == userId));
-
-                    privateChats.Add(new PrivateChatItemDto
-                    {
-                        ChatId = userId, // Use current user's ID for system chat
-                        ChatKey = $"systemchat_{userId}",
-                        ChatName = "ایران اروپا", // School name from config
-                        ProfilePicName = "system_icon",
-                        LastMessage = new ChatMessageDto
-                        {
-                            MessageId = lastSystemMessage.MessageId,
-                            Text = lastSystemMessage.MessageTexts.FirstOrDefault()?.MessageTxt,
-                            SenderId = lastSystemMessage.SenderUserId,
-                            SenderName = lastSystemMessage.SenderUser?.NameFamily,
-                            SentAt = lastSystemMessage.MessageDateTime
-                        },
-                        UnreadCount = unreadSystemCount,
-                        IsSystemChat = true,
-                        OtherUserId = null,
-                        LastMessageDateTime = lastSystemMessage.MessageDateTime
+                        UnreadCount = totalUnreadCount,
+                        IsSystemChat = lastMessage.SenderUserId == _accountSettings.SystemId || otherUserId == _accountSettings.SystemId,
+                        OtherUserId = otherUserId,
+                        LastMessageDateTime = lastMessage.MessageDateTime
                     });
                 }
 
@@ -2613,7 +2722,7 @@ namespace Messenger.Services.Services
 
         public async Task<long> GetOtherUserIdInPrivateChat(long conversationId, long currentUserId)
         {
-            
+
 
             var conversation = await _context.PrivateChatConversations
                 .AsNoTracking()

@@ -36,15 +36,15 @@
                 <div class="chat-list-image">
                     @if (item.ProfilePicName == "system_icon")
                     {
-                        <img src="~/assets/media/shared-photos/03.jpg" alt="@item.ChatName" class="rounded-circle">
+                        <img src="~/chatzy/assets/images/logo/72.png" width="50" alt="@item.ChatName" class="rounded-circle">
                     }
                     else if (!string.IsNullOrEmpty(item.ProfilePicName))
                     {
-                        <img src="~/assets/media/avatar/UserIcon.png" width="50" alt="@item.ChatName" class="rounded-circle">
+                        <img src="~/chatzy/assets/images/logo/72.png" width="50" alt="@item.ChatName" class="rounded-circle">
                     }
                     else
                     {
-                        <i class="iconsax icon-btn" data-icon="user"> </i>
+                        <i class="iconsax icon-btn" data-icon="user"> </i><img src="~/chatzy/assets/images/logo/72.png" width="50" alt="@item.ChatName" class="rounded-circle">
                     }
                 </div>
                 <div class="chat-details">

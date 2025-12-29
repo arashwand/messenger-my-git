@@ -42,6 +42,9 @@ builder.Services.Configure<JwtSettings>(
 builder.Services.Configure<TimeSettingOptions>(
     builder.Configuration.GetSection(TimeSettingOptions.SectionName));
 
+builder.Services.Configure<AccountSetting>(
+    builder.Configuration.GetSection(AccountSetting.SectionName));
+
 // Create Configuration variable to read from appSettings.json  
 var Configuration = builder.Configuration;
 builder.Services.AddControllersWithViews();

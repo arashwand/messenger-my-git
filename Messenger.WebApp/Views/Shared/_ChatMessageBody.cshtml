@@ -19,13 +19,24 @@
             chatGroupId = groupId;
         }
     }
-    
+
     // ✅ دریافت نام چت
     var chatName = ViewData["chatName"]?.ToString() ?? "چت";
-    
+    bool systemChat = false;
+    if (ViewData.ContainsKey("isSystemChat"))
+    {
+        if (ViewData["isSystemChat"] != null)
+        {
+            if (bool.TryParse(@ViewData["isSystemChat"].ToString(), out bool result))
+            {
+                systemChat = result;
+            }
+        }
+    }
+
     // دریافت chatKey برای چت‌های خصوصی
     var chatKey = ViewData["chatKey"]?.ToString() ?? "";
-    
+
     string[] AllowedImages = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"];
     if (ViewData.ContainsKey("allowedImagesExtention"))
     {
@@ -90,14 +101,13 @@
         line-height: 1.4;
     }
 
-    .svg-arrow-down{
+    .svg-arrow-down {
         background-color: rgba(0, 0, 0, 0.125);
         border-radius: 50%;
         padding: 6px 2px 7px 5px;
         margin: 3px;
     }
 
-   
 </style>
 
 <input type="hidden" id="chatKey" value="@chatKey" />
@@ -157,9 +167,9 @@
 
         <div id="newMessagesNotice" class="sticky-top mt-4 p-1 btn btn-success" style="display:none; cursor:pointer; z-index: 10; padding-bottom: 5px !important; margin-bottom: 5px;" data-newCount="0">
             مشاهده پیام‌های جدید
-           
+
         </div>
-        
+
 
         <input type="hidden" id="lastMessageIdLoad" value="@(Model.Count() > 0 ? Model.First().MessageId : 0)" />
         @* <input type="hidden" id="hasMoreMessages" value="@true" />*@
@@ -206,6 +216,11 @@
                         bool IsSystemMessage = message.IsSystemMessage;
                         bool hasRecorderFile = message.MessageFiles?.Any(f => f.FileExtension.Extension == ".webm") ?? false;
                         bool isRead = message.IsReadByCurrentUser;
+                        string MessageStyle = "systemMessage";
+                        if (IsSystemMessage)
+                        {
+                            MessageStyle = "";
+                        }
                         if (isSelf)
                         {
                             isRead = true;
@@ -239,7 +254,7 @@
                         };
                         var messageDetailsJson = JsonConvert.SerializeObject(messageDetailsForEdit);
 
-                        <li class="message @(isSelf ? "personal" : "new") @(IsSystemMessage ? "systemMessage" : "")" id="message-@message.MessageId"
+                        <li class="message @(isSelf ? "personal" : "new") @(IsSystemMessage ? "MessageStyle" : "")" id="message-@message.MessageId"
                             data-message-id="@message.MessageId"
                             data-sender-id="@message.SenderUserId"
                             data-sender-username="@message.SenderUser.NameFamily"
@@ -341,7 +356,7 @@
                                 {
                                     if (IsSystemMessage)
                                     {
-                                        <img class="img-fluid person-img" src="~/assets/media/shared-photos/03.jpg" alt="p9">
+                                        <img class="img-fluid person-img" src="~/chatzy/assets/images/logo/72.png" alt="p9" style="background-color:#fff; border:2px solid #0d6efd">
                                     }
                                     else
                                     {
@@ -358,7 +373,7 @@
                                         </div>
                                     }
 
-                                    <h5 style="white-space: pre-line;line-height:0.6;">
+                                    <h5 style="white-space: pre-line;line-height: 2em;margin-top: -2em;margin-bottom: -2em;">
                                         @message.MessageText?.MessageTxt
                                         @if (message.IsEdited)
                                         {
@@ -462,7 +477,9 @@
 </section>
 <!-- group chat section end -->
 <!--  message input section starts -->
-<div class="messages-panel">
+@if (!systemChat)
+{
+    <div class="messages-panel">
     <!-- کانتینر برای بنرهای عملیاتی (پاسخ و ویرایش) -->
     <div class="action-banners-container">
         <span class="svg-arrow-down sticky-top mt-4 p-1 btn" style="display:none;">
@@ -473,7 +490,7 @@
             <div class="edit-bar"></div>
             <div class="edit-indicator">
                 <span class="edit-text m-1">در حال ویرایش</span>
-              
+
             </div>
             <a href="#" id="cancel-edit-button">انصراف</a>
         </div>
@@ -551,7 +568,7 @@
     </form>
 
 </div>
-
+}
 
 
 

@@ -310,6 +310,11 @@ namespace Messenger.API.ServiceHelper
         #region ersal be list id karbaran
 
         /// <summary>
+        /// تعداد برای تکه تکه ارسال کردن پیام ها
+        /// </summary>
+        private const int batchSize = 1000;
+
+        /// <summary>
         /// ارسال به همه
         /// در اینجا تصمیم گیری میشه چطور و به کجا ارسال انجام بشه
         /// </summary>
@@ -367,7 +372,7 @@ namespace Messenger.API.ServiceHelper
                 }
 
                 var successfulUserIds = new List<long>();
-                const int batchSize = 1000;  // اندازه batch (قابل تنظیم)
+               
 
                 // تقسیم به batchها
                 var batches = peopleTargetIds.Select((id, index) => new { Id = id, Index = index })
