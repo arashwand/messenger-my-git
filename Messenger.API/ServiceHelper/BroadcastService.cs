@@ -295,7 +295,7 @@ namespace Messenger.API.ServiceHelper
                 // گام نهایی: بازگشت نتیجه موفق شامل تعداد گیرندگان
                 return new BroadcastResultDto
                 {
-                    MessageText = $"Successfully sent message to {targetIdsCount} recipients",
+                    MessageText = $"با موفقیت به تعداد  {targetIdsCount} گیرنده ارسال شد",
                     TargetIdsCount = targetIdsCount
                 };
             }
@@ -307,6 +307,7 @@ namespace Messenger.API.ServiceHelper
             }
         }
 
+        #region ersal be list id karbaran
 
         /// <summary>
         /// ارسال به همه
@@ -352,123 +353,44 @@ namespace Messenger.API.ServiceHelper
                     throw new InvalidOperationException("Failed to save broadcast message");
                 }
 
-                int targetIdsCount = 0;
+                var peopleTargetIds = request.UserIds;
 
-                // شاخه مربوط به ارسال به کاربران بر اساس نقش
-                try
+                if (peopleTargetIds.Count == 0)
                 {
-                    // 4.a -  لیست کاربران هدف
-                    var peopleTargetIds = request.UserIds;
-                    targetIdsCount = peopleTargetIds.Count;
-
-                    if (targetIdsCount == 0)
+                    _logger.LogWarning("No recipients found for message type {MessageType}", request.MessageType);
+                    return new BroadcastResultDto
                     {
-                        _logger.LogWarning("No recipients found for message type {MessageType}", request.MessageType);
-                        return new BroadcastResultDto
-                        {
-                            MessageText = $"No recipients found for {request.MessageType}",
-                            TargetIdsCount = 0
-                        };
-                    }
-
-                    //به ازای هر گیرنده ابتدا باید برسی بشه که ایدی اختصاصی چت بین ایشون و سیستم وجود داره یا خیر
-                    // اگه نداره باید ساخته بشه
-                    // سپس به ازای هر ایدی چتی که ایجاد شد و ایدی پیام، یک رکورد در جدول گیرندگان ایجاد میشه 
-
-                    foreach (var item in request.UserIds)
-                    {
-                        //ایجاد یا بدست اوردن ایدی چت
-                        var conversation = await _context.PrivateChatConversations
-                         .FirstOrDefaultAsync(c => (c.User1Id == savedMessageDto.SenderUserId && c.User2Id == item) ||
-                            (c.User1Id == item && c.User2Id == savedMessageDto.SenderUserId));
-
-                        if (conversation == null)
-                        {
-                            conversation = new PrivateChatConversation
-                            {
-                                ConversationId = GenerateSecureRandomLong.Generate(),
-                                User1Id = savedMessageDto.SenderUserId,
-                                User2Id = item
-                            };
-                            _context.PrivateChatConversations.Add(conversation);
-                            await _context.SaveChangesAsync();
-                        }
-
-                        long conversationId = conversation.ConversationId;
-
-
-                        List<MessageRecipient> recipients = new List<MessageRecipient>();
-                        //درج در جدول گیرندگان پیام
-                        try
-                        {
-                            var recipient = new MessageRecipient
-                            {
-                                MessageId = savedMessageDto.MessageId,
-                                UserConversationId = conversationId,
-                                
-                            };
-                            recipients.Add(recipient);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw;
-                        }
-
-                        _context.MessageRecipients.AddRange(recipients);
-                        await _context.SaveChangesAsync();
-                    }
-
-
-
-                    // 4.b - ارسال پیام به شناسه‌های کاربران مشخص شده از طریق SignalR Users
-                    var userIdentifiers = peopleTargetIds.Select(id => id.ToString());
-
-                    await _hubContext.BroadcastToUsersAndBridgeAsync(_logger, BridgeGroupName, userIdentifiers, "BroadcastToUsers",
-                        new object[] { savedMessageDto, request.MessageType, peopleTargetIds });
-
-                    _logger.LogInformation("Successfully sent broadcast message to {Count} recipients of type {MessageType}",
-                        targetIdsCount,
-                        request.MessageType);
-
-                    // 4.c - افزایش شمارنده unread برای هر کاربر (در این حالت targetId و groupType خاصی نداریم)
-                    var tasks = new List<Task>();
-                    foreach (var userId in peopleTargetIds)
-                    {
-                        tasks.Add(_redisUnreadManage.IncrementUnreadCountAsync(userId, 0, string.Empty));
-                        // ارسال UpdateUnreadCount
-                        tasks.Add(_redisUnreadManage.GetUnreadCountAsync(userId, 0, string.Empty).ContinueWith(async tResult =>
-                        {
-                            if (tResult.IsFaulted)
-                            {
-                                _logger.LogError(tResult.Exception, "Error retrieving unread count for user {UserId}", userId);
-                                return;
-                            }
-
-                            var unreadCount = tResult.Result;
-                            await _hubContext.Clients.User(userId.ToString()).SendAsync("UpdateUnreadCount", userId, "", unreadCount);
-                            await _hubContext.Clients.Group(BridgeGroupName).SendAsync("UpdateUnreadCount", userId, "", unreadCount);
-                        }).Unwrap());
-                    }
-                    await Task.WhenAll(tasks);
+                        MessageText = $"No recipients found for {request.MessageType}",
+                        TargetIdsCount = 0,
+                        SuccessfulUserIds = new List<long>()
+                    };
                 }
-                catch (ArgumentException ex)
+
+                var successfulUserIds = new List<long>();
+                const int batchSize = 1000;  // اندازه batch (قابل تنظیم)
+
+                // تقسیم به batchها
+                var batches = peopleTargetIds.Select((id, index) => new { Id = id, Index = index })
+                                             .GroupBy(x => x.Index / batchSize)
+                                             .Select(g => g.Select(x => x.Id).ToList())
+                                             .ToList();
+
+                foreach (var batch in batches)
                 {
-                    // خطاهای مرتبط با نوع پیام را لاگ و دوباره پراکنده می‌کنیم
-                    _logger.LogError(ex, "Invalid message type while sending message: {MessageType}", request.MessageType);
-                    throw;
+                    var batchSuccessfulIds = await ProcessBatchAsync(batch, savedMessageDto, request.MessageType, peopleTargetIds);
+                    successfulUserIds.AddRange(batchSuccessfulIds);
                 }
-                catch (Exception ex)
-                {
-                    // سایر خطاها را لاگ و به صورت InvalidOperationException بالا می‌بریم
-                    _logger.LogError(ex, "Error broadcasting to {MessageType}: {Error}", request.MessageType, ex.Message);
-                    throw new InvalidOperationException($"Failed to broadcast message to {request.MessageType}", ex);
-                }
+
+                _logger.LogInformation("Successfully sent broadcast message to {Count} recipients of type {MessageType}",
+                    successfulUserIds.Count,
+                    request.MessageType);
 
                 // گام نهایی: بازگشت نتیجه موفق شامل تعداد گیرندگان
                 return new BroadcastResultDto
                 {
-                    MessageText = $"Successfully sent message to {targetIdsCount} recipients",
-                    TargetIdsCount = targetIdsCount
+                    MessageText = $"با موفقیت به تعداد  {successfulUserIds.Count} گیرنده ارسال شد",
+                    TargetIdsCount = successfulUserIds.Count,
+                    SuccessfulUserIds = successfulUserIds
                 };
             }
             catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
@@ -479,6 +401,104 @@ namespace Messenger.API.ServiceHelper
             }
         }
 
+        private async Task<List<long>> ProcessBatchAsync(List<long> batch, MessageDto savedMessageDto, EnumMessageType messageType, List<long> allUserIds)
+        {
+            var successfulIds = new List<long>();
+
+            // ۱. پیدا کردن conversations موجود برای این batch
+            var existingConversations = await _context.PrivateChatConversations
+                .Where(c => (c.User1Id == savedMessageDto.SenderUserId && batch.Contains(c.User2Id)) ||
+                            (c.User2Id == savedMessageDto.SenderUserId && batch.Contains(c.User1Id)))
+                .ToDictionaryAsync(c => new { c.User1Id, c.User2Id }, c => c);
+
+            var newConversations = new List<PrivateChatConversation>();
+
+            foreach (var item in batch)
+            {
+                var key1 = new { User1Id = savedMessageDto.SenderUserId, User2Id = item };
+                var key2 = new { User1Id = item, User2Id = savedMessageDto.SenderUserId };
+
+                if (!existingConversations.ContainsKey(key1) && !existingConversations.ContainsKey(key2))
+                {
+                    newConversations.Add(new PrivateChatConversation
+                    {
+                        ConversationId = GenerateSecureRandomLong.Generate(),
+                        User1Id = savedMessageDto.SenderUserId,
+                        User2Id = item
+                    });
+                }
+            }
+
+            // درج conversations جدید یکجا
+            if (newConversations.Any())
+            {
+                _context.PrivateChatConversations.AddRange(newConversations);
+                await _context.SaveChangesAsync();
+            }
+
+            // اضافه کردن conversations جدید به دیکشنری
+            foreach (var conv in newConversations)
+            {
+                existingConversations[new { conv.User1Id, conv.User2Id }] = conv;
+            }
+
+            // ۲. ایجاد MessageRecipients برای batch
+            var recipients = new List<MessageRecipient>();
+            foreach (var item in batch)
+            {
+                try
+                {
+                    var key1 = new { User1Id = savedMessageDto.SenderUserId, User2Id = item };
+                    var key2 = new { User1Id = item, User2Id = savedMessageDto.SenderUserId };
+                    var conversation = existingConversations.GetValueOrDefault(key1) ?? existingConversations.GetValueOrDefault(key2);
+
+                    if (conversation != null)
+                    {
+                        recipients.Add(new MessageRecipient
+                        {
+                            MessageId = savedMessageDto.MessageId,
+                            UserConversationId = conversation.Id,
+                        });
+                        successfulIds.Add(item);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to process user {UserId}", item);
+                    // ادامه به گیرنده بعدی
+                }
+            }
+
+            // درج MessageRecipients یکجا
+            if (recipients.Any())
+            {
+                _context.MessageRecipients.AddRange(recipients);
+                await _context.SaveChangesAsync();
+            }
+
+            // ۳. ارسال پیام به شناسه‌های کاربران مشخص شده از طریق SignalR Users
+            var userIdentifiers = batch.Select(id => id.ToString()).ToArray();
+
+            await _hubContext.BroadcastToUsersAndBridgeAsync(_logger, BridgeGroupName, userIdentifiers, "BroadcastToUsers",
+                new object[] { savedMessageDto, messageType, batch });
+
+            // ۴. افزایش شمارنده unread برای هر کاربر (در این حالت targetId و groupType خاصی نداریم)
+            var tasks = batch.Select(userId => IncrementUnreadForUserAsync(userId)).ToList();
+            await Task.WhenAll(tasks);
+
+            return successfulIds;
+        }
+
+        private async Task IncrementUnreadForUserAsync(long userId)
+        {
+            await _redisUnreadManage.IncrementUnreadCountAsync(userId, 0, string.Empty);
+            // ارسال UpdateUnreadCount
+            var unreadCount = await _redisUnreadManage.GetUnreadCountAsync(userId, 0, string.Empty);
+            await _hubContext.Clients.User(userId.ToString()).SendAsync("UpdateUnreadCount", userId, "", unreadCount);
+            await _hubContext.Clients.Group(BridgeGroupName).SendAsync("UpdateUnreadCount", userId, "", unreadCount);
+        }
+
+        #endregion
 
         /// <summary>
         /// ارسال پیام به یک هدف خاص: فرد، گروه یا کانال

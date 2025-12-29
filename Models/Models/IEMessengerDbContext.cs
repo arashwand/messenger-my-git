@@ -311,13 +311,14 @@ public partial class IEMessengerDbContext : DbContext
 
             entity.ToTable("MessageRecipients");
 
+            // تغییر نام index به UserConversationId (به جای RecipientUserId)
             entity.HasIndex(e => new { e.MessageId, e.UserConversationId }, "IX_MessageRecipients_Message_Recipient");
 
-            entity.HasIndex(e => e.UserConversationId, "IX_MessageRecipients_RecipientUserId");
+            entity.HasIndex(e => e.UserConversationId, "IX_MessageRecipients_UserConversationId");  // تغییر نام index
 
             entity.Property(e => e.MessageRecipientId).HasColumnName("MessageRecipientID");
             entity.Property(e => e.MessageId).HasColumnName("MessageID");
-            entity.Property(e => e.UserConversationId).HasColumnName("RecipientUserID");
+            entity.Property(e => e.UserConversationId).HasColumnName("UserConversationId");
             entity.Property(e => e.ReadDateTime).HasColumnType("datetime");
 
             entity.HasOne(d => d.Message).WithMany(p => p.MessageRecipients)
@@ -325,10 +326,11 @@ public partial class IEMessengerDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_MessageRecipients_Messages");
 
-            entity.HasOne(d => d.RecipientUser).WithMany(p => p.MessageRecipients)
-                .HasForeignKey(d => d.UserConversationId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_MessageRecipients_Users");
+            entity.HasOne(d => d.Conversation).WithMany(p => p.MessageRecipients)  // فرض بر این است که PrivateChatConversation ICollection<MessageRecipient> دارد
+         .HasForeignKey(d => d.UserConversationId)
+         .OnDelete(DeleteBehavior.ClientSetNull)  // یا Cascade اگر مناسب است
+         .HasConstraintName("FK_MessageRecipients_PrivateChatConversations");  // تغییر نام constraint
+
         });
 
         modelBuilder.Entity<MessageSaved>(entity =>

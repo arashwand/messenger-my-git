@@ -366,7 +366,7 @@ namespace Messenger.Services.Services
                 // ایجاد پیام
                 var messageEntity = new Message
                 {
-                    SenderUserId = senderUserId,
+                    SenderUserId = 100,
                     MessageDateTime = DateTime.UtcNow,
                     MessageType = (byte)messageType,
                     IsPin = isPin,
@@ -402,7 +402,7 @@ namespace Messenger.Services.Services
                 var messageSavedModel = new MessageDto
                 {
                     MessageId = messageEntity.MessageId,
-                    SenderUserId = 0,
+                    SenderUserId = messageEntity.SenderUserId,
                     MessageDateTime = messageEntity.MessageDateTime,
                     MessageType = messageEntity.MessageType,
                     MessageText = messageTextEntity != null ? new MessageTextDto
@@ -412,8 +412,10 @@ namespace Messenger.Services.Services
                     } : null,
                     SenderUser = new UserDto
                     {
-                        UserId = 0,
-                        NameFamily = "Portal",
+                        UserId = messageEntity.SenderUserId,
+                        NameFamily = messageEntity.SenderUser.NameFamily,
+                        RoleFaName = messageEntity.SenderUser.RoleFaName,
+                        RoleName = messageEntity.SenderUser.RoleName
                     },
                 };
 
@@ -2428,6 +2430,12 @@ namespace Messenger.Services.Services
 
         #region Private Chats & System Messages
 
+        /// <summary>
+        /// دریافت چتهای خصوصی کاربر
+        /// شامل پیامهای دونفره و پیامهای سیستم
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns></returns>
         public async Task<IEnumerable<PrivateChatItemDto>> GetUserPrivateChatsAsync(long userId)
         {
             try
@@ -2443,7 +2451,7 @@ namespace Messenger.Services.Services
 
                 // 1. Get regular private messages (one-to-one)
                 var regularPrivateMessages = await _context.Messages
-                    .Where(m => m.MessageType == (byte)EnumMessageType.Private && !m.IsSystemMessage && !m.IsHidden)
+                    .Where(m => m.MessageType == (byte)EnumMessageType.Private  && !m.IsHidden)
                     .Where(m => m.SenderUserId == userId || m.OwnerId == userId)
                     .Include(m => m.MessageTexts)
                     .Include(m => m.SenderUser)

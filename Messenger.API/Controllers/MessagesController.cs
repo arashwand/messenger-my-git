@@ -160,7 +160,7 @@ namespace Messenger.API.Controllers
 
 
         /// <summary>
-        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران
+        /// ارسال پیام به لیست کاربران
         /// </summary>
         [HttpPost("send-private-message-all-portal")]
         [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
@@ -185,7 +185,8 @@ namespace Messenger.API.Controllers
                 return Ok(new
                 {
                     Message = savedMessageDto.MessageText,
-                    Data = savedMessageDto.TargetIdsCount
+                    Data = savedMessageDto.TargetIdsCount,
+                    SuccessfulUserIds = savedMessageDto.SuccessfulUserIds
                 });
             }
             catch (Exception ex)
