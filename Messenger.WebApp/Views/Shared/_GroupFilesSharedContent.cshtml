@@ -25,13 +25,13 @@
 <div class="tab-content pt-3" id="groupFilesTabContent">
     <!-- Media Tab -->
     <div class="tab-pane fade @(Model.ActiveTab == "media-tab" ? "show active" : "")" id="media-tab-pane" role="tabpanel" aria-labelledby="media-tab">
-        <div class="row g-3 files-container">
+        <div class="row g-3 files-container image-group">
             @if (Model.MediaFiles != null && Model.MediaFiles.Any())
             {
                 foreach (var file in Model.MediaFiles)
                 {
                     var thumbnailUrl = $"/api/Chat/downloadThumbnailById?messageFileId={file.MessageFileId}";
-                    <div class="col-4">
+                    <div class="col-4 file-attachment-item" data-file-id="@file.MessageFileId">
                         <div class="card file-card h-100">
 
                             <div class="card-body">
