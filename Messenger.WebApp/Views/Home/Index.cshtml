@@ -466,7 +466,13 @@
             
             console.log('---' + chatSelectedTitle);
 
-            let selectedChatId = `${groupType}_${chatId}`;
+            let selectedChatId;
+            if (groupType.toLowerCase() === 'private') {
+                selectedChatId = `${groupType.toLowerCase()}_${chatId}`;
+            } else {
+                // For "ClassGroup" and "Channel" which become "classgroup123"
+                selectedChatId = `${groupType.toLowerCase()}${chatId}`;
+            }
             window.activeGroupId = selectedChatId;
             if(selectedChat.length) {
                 const chatItemsBody = $('#chatContactTab');

@@ -123,7 +123,7 @@ namespace Messenger.API.Controllers
         }
 
         /// <summary>
-        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران بر اساس نقش
+        /// ارسال پیام به همه گروه‌ها، کانال‌ها یا کاربران
         /// </summary>
         [HttpPost("send-message-all-portal")]
         [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
@@ -224,7 +224,14 @@ namespace Messenger.API.Controllers
             return Ok(messages);
         }
 
-        
+        //[HttpGet("channel/{channelId}")]
+        //public async Task<ActionResult<IEnumerable<MessageDto>>> GetChannelMessages(int channelId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
+        //{
+        //    var userId = GetCurrentUserId();
+        //    if (userId <= 0) return Unauthorized();
+        //    var messages = await _messageService.GetChannelMessagesAsync(channelId, userId, pageNumber, pageSize);
+        //    return Ok(messages);
+        //}
 
 
         /// <summary>

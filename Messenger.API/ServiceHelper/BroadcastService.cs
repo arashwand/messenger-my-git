@@ -67,7 +67,6 @@ namespace Messenger.API.ServiceHelper
                 .ToListAsync();
         }
 
-
         /// <summary>
         /// ارسال به همه
         /// در اینجا تصمیم گیری میشه چطور و به کجا ارسال انجام بشه
@@ -558,7 +557,7 @@ namespace Messenger.API.ServiceHelper
                     var groupType = request.TargetType == ConstChat.ClassGroupType ? ConstChat.ClassGroupType : ConstChat.ChannelGroupType;
                     savedMessageDto = await _messageService.SendGroupMessageAsync(
                         senderUserId: senderUserId,
-                        classId: request.TargetId,
+                        classId: request.TargetId.ToString(),
                         groupType: groupType,
                         messageText: request.MessageText,
                         files: request.FileIds,
