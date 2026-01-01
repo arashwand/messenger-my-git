@@ -6,13 +6,19 @@
 
 <ul class="nav nav-tabs" id="groupFilesTab" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link @(Model.ActiveTab == "media-tab" ? "active" : "")" id="media-tab" data-bs-toggle="tab" data-bs-target="#media-tab-pane" type="button" role="tab" aria-controls="media-tab-pane" aria-selected="@(Model.ActiveTab == "media-tab" ? "true" : "false")">Media</button>
+        <button class="nav-link @(Model.ActiveTab == "media-tab" ? "active" : "")" id="media-tab" data-bs-toggle="tab" data-bs-target="#media-tab-pane" type="button" role="tab" aria-controls="media-tab">
+            مدیا
+        </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link @(Model.ActiveTab == "docs-tab" ? "active" : "")" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs-tab-pane" type="button" role="tab" aria-controls="docs-tab-pane" aria-selected="@(Model.ActiveTab == "docs-tab" ? "true" : "false")">Documents</button>
+        <button class="nav-link @(Model.ActiveTab == "docs-tab" ? "active" : "")" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs-tab-pane" type="button" role="tab" aria-controls="docs-tab">
+            اسناد
+        </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link @(Model.ActiveTab == "links-tab" ? "active" : "")" id="links-tab" data-bs-toggle="tab" data-bs-target="#links-tab-pane" type="button" role="tab" aria-controls="links-tab-pane" aria-selected="@(Model.ActiveTab == "links-tab" ? "true" : "false")">Links</button>
+        <button class="nav-link @(Model.ActiveTab == "links-tab" ? "active" : "")" id="links-tab" data-bs-toggle="tab" data-bs-target="#links-tab-pane" type="button" role="tab" aria-controls="links-tab">
+            پیوندها
+        </button>
     </li>
 </ul>
 
@@ -24,15 +30,15 @@
             {
                 foreach (var file in Model.MediaFiles)
                 {
-                    var thumbnailUrl = !string.IsNullOrEmpty(file.FileThumbPath) ? $"{Model.BaseUrl}/{file.FileThumbPath}" : $"/{file.FilePath}";
+                    var thumbnailUrl = $"/api/Chat/downloadThumbnailById?messageFileId={file.MessageFileId}";
                     <div class="col-4">
                         <div class="card file-card h-100">
-                           
+
                             <div class="card-body">
                                 <a href="#" style="text-align:center;">
-                                    <img src="@thumbnailUrl" class="card-img-top file-thumbnail" alt="image file">
+                                    <img src="@thumbnailUrl" class="card-img-top file-thumbnail chat-thumbnail" data-original-filename="@file.OriginalFileName" alt="image file" style="cursor:pointer;">
                                 </a>
-                               
+
                             </div>
                             <div class="card-footer">
 
@@ -41,7 +47,7 @@
 
                                 <a class="btn-download-file d-inline" data-file-id="@file.MessageFileId" href="#">
                                     <img src="~/chatzy/assets/iconsax/download.svg" class="" />&nbsp;
-                                  
+
                                 </a>
 
                             </div>
@@ -71,12 +77,12 @@
                                 <div class="file-size text-muted small">@FormatFileSize(file.FileSize)</div>
                             </div>
                         </div>
-                       @*  <a href="#" class="btn btn-sm btn-outline-primary btn-download-file" data-file-id="@file.MessageFileId">
+                        @*  <a href="#" class="btn btn-sm btn-outline-primary btn-download-file" data-file-id="@file.MessageFileId">
                             <i class="iconsax" data-icon="document-download"></i> Download
                         </a> *@
                         <a class="btn-download-file" data-file-id="@file.MessageFileId" href="#">
                             <img src="~/chatzy/assets/iconsax/download.svg" class="" />&nbsp;
-                           @*  <span>Download</span> *@
+                            @*  <span>Download</span> *@
                         </a>
 
                     </li>
