@@ -7,10 +7,10 @@
 @section Styles {
     <style>
         /*  body {
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                            direction: rtl;
-                        }
-                        */
+                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                                    direction: rtl;
+                                }
+                                */
 
         .spinner {
             display: inline-block;
@@ -20,14 +20,21 @@
             border-top: 2px solid #3498db;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-left: 10px;
+            margin-right: 10px;
         }
 
         @@keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0%
+
+        {
+            transform: rotate(0deg);
         }
 
+        100% {
+            transform: rotate(360deg);
+        }
+
+        }
     </style>
 }
 
@@ -122,8 +129,8 @@
                 </div>
 
                 <button type="submit" class="submit-btn" id="submitBtn">
-                    <span id="btnText">ورود به پیام رسان</span>
                     <div id="btnSpinner" class="spinner" style="display:none;"></div>
+                    <span id="btnText">ورود به پیام رسان</span>
                 </button>
             </form>
         </div>
@@ -204,7 +211,7 @@
 
                 // Show loading
                 submitBtn.disabled = true;
-                btnText.style.display = 'none';
+                btnText.textContent = 'در حال ورود...';
                 btnSpinner.style.display = 'inline-block';
 
                 const loginCode = (document.getElementById('LoginCode')?.value || '').trim();
@@ -244,7 +251,7 @@
                         } else {
                             // Hide loading on failure
                             submitBtn.disabled = false;
-                            btnText.style.display = 'inline';
+                            btnText.textContent = 'ورود به پیام رسان';
                             btnSpinner.style.display = 'none';
                             validationDiv.innerHTML = data.message || JSON.stringify(data.errors || 'خطای ورود');
                             return;
@@ -262,13 +269,13 @@
                     const doc = parser.parseFromString(html, 'text/html');
                     // Hide loading on failure
                     submitBtn.disabled = false;
-                    btnText.style.display = 'inline';
+                    btnText.textContent = 'ورود به پیام رسان';
                     btnSpinner.style.display = 'none';
                     validationDiv.innerHTML = doc.querySelector('.text-danger')?.textContent?.trim() || 'خطای ورود';
                 } catch (err) {
                     // Hide loading on error
                     submitBtn.disabled = false;
-                    btnText.style.display = 'inline';
+                    btnText.textContent = 'ورود به پیام رسان';
                     btnSpinner.style.display = 'none';
                     validationDiv.innerHTML = 'خطا در ارسال درخواست.';
                 }
