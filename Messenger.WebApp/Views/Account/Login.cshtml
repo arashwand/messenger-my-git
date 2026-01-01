@@ -12,6 +12,21 @@
                         }
                         */
 
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
     </style>
 }
@@ -40,7 +55,7 @@
         <div class="planet planet-1"></div>
         <div class="planet planet-2"></div>
         <div class="planet planet-3"></div>
-        <div class="planet saturn"></div>
+        <div class="saturn"></div>
         <div class="shooting-star"></div>
         <div class="shooting-star"></div>
         <div class="shooting-star"></div>
@@ -106,8 +121,9 @@
                     </label>
                 </div>
 
-                <button type="submit" class="submit-btn">
-                    ورود به پیام رسان
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <div id="btnSpinner" class="spinner" style="display:none;"></div>
+                    <span id="btnText">ورود به پیام رسان</span>
                 </button>
             </form>
         </div>
@@ -144,7 +160,7 @@
 
         // Toggle Password Visibility
         function togglePassword() {
-            const passwordInput = document.getElementById('passwordInput');
+            const passwordInput = document.getElementById('Password');
             const eyeIcon = document.getElementById('eyeIcon');
 
             if (!passwordInput || !eyeIcon) return;
@@ -152,7 +168,7 @@
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
                 eyeIcon.innerHTML = `
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-5.56 2"/>
                     <line x1="1" y1="1" x2="23" y2="23"/>
                 `;
             } else {
@@ -181,6 +197,15 @@
                 e.preventDefault();
                 const btn = document.querySelector('.submit-btn');
                 const validationDiv = document.getElementById('validationSummary') || document.createElement('div');
+
+                const submitBtn = document.getElementById('submitBtn');
+                const btnText = document.getElementById('btnText');
+                const btnSpinner = document.getElementById('btnSpinner');
+
+                // Show loading
+                submitBtn.disabled = true;
+                btnText.textContent = 'در حال ورود...';
+                btnSpinner.style.display = 'inline-block';
 
                 const loginCode = (document.getElementById('LoginCode')?.value || '').trim();
                 const password = (document.getElementById('Password')?.value || '');
@@ -217,6 +242,10 @@
                             window.location.href = data.redirect || returnUrl || '/home/index';
                             return;
                         } else {
+                            // Hide loading on failure
+                            submitBtn.disabled = false;
+                            btnText.textContent = 'ورود به پیام رسان';
+                            btnSpinner.style.display = 'none';
                             validationDiv.innerHTML = data.message || JSON.stringify(data.errors || 'خطای ورود');
                             return;
                         }
@@ -231,8 +260,16 @@
                     const html = await response.text();
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
+                    // Hide loading on failure
+                    submitBtn.disabled = false;
+                    btnText.textContent = 'ورود به پیام رسان';
+                    btnSpinner.style.display = 'none';
                     validationDiv.innerHTML = doc.querySelector('.text-danger')?.textContent?.trim() || 'خطای ورود';
                 } catch (err) {
+                    // Hide loading on error
+                    submitBtn.disabled = false;
+                    btnText.textContent = 'ورود به پیام رسان';
+                    btnSpinner.style.display = 'none';
                     validationDiv.innerHTML = 'خطا در ارسال درخواست.';
                 }
             });
