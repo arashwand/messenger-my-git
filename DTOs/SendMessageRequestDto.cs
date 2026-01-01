@@ -66,5 +66,7 @@ namespace Messenger.DTOs
         /// لیست ایدی افراد
         /// </summary>
         public int TargetIdsCount { get; set; }
+
+        public List<long> SuccessfulUserIds { get; set; } = new List<long>(); // اضافه شده
     }
 }

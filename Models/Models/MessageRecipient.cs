@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace Messenger.Models.Models;
 
@@ -16,5 +16,8 @@ public partial class MessageRecipient
 
     public virtual Message Message { get; set; } = null!;
 
-    public virtual User RecipientUser { get; set; } = null!;
+    public virtual PrivateChatConversation Conversation { get; set; } = null!; 
+
+
+
 }

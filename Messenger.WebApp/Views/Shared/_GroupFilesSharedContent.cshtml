@@ -33,12 +33,12 @@
                     var thumbnailUrl = $"/api/Chat/downloadThumbnailById?messageFileId={file.MessageFileId}";
                     <div class="col-4">
                         <div class="card file-card h-100">
-                            
+
                             <div class="card-body">
                                 <a href="#" style="text-align:center;">
                                     <img src="@thumbnailUrl" class="card-img-top file-thumbnail chat-thumbnail" data-original-filename="@file.OriginalFileName" alt="image file" style="cursor:pointer;">
                                 </a>
-                                
+
                             </div>
                             <div class="card-footer">
 
@@ -47,7 +47,7 @@
 
                                 <a class="btn-download-file d-inline" data-file-id="@file.MessageFileId" href="#">
                                     <img src="~/chatzy/assets/iconsax/download.svg" class="" />&nbsp;
-                                   
+
                                 </a>
 
                             </div>
@@ -77,12 +77,12 @@
                                 <div class="file-size text-muted small">@FormatFileSize(file.FileSize)</div>
                             </div>
                         </div>
-                       @*  <a href="#" class="btn btn-sm btn-outline-primary btn-download-file" data-file-id="@file.MessageFileId">
+                        @*  <a href="#" class="btn btn-sm btn-outline-primary btn-download-file" data-file-id="@file.MessageFileId">
                             <i class="iconsax" data-icon="document-download"></i> Download
                         </a> *@
                         <a class="btn-download-file" data-file-id="@file.MessageFileId" href="#">
                             <img src="~/chatzy/assets/iconsax/download.svg" class="" />&nbsp;
-                           @*  <span>Download</span> *@
+                            @*  <span>Download</span> *@
                         </a>
 
                     </li>

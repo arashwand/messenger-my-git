@@ -51,11 +51,11 @@ namespace Messenger.WebApp.ServiceHelper
             return response;
         }
 
-        public async Task<IEnumerable<MessageDto>> GetPrivateMessagesByConversationIdAsync(long conversationId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
+        public async Task<PrivateChatDto> GetPrivateMessagesByConversationIdAsync(long conversationId, int pageSize, long messageId = 0, bool loadOlder = false, bool loadBothDirections = false)
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<MessageDto>>(
+            var response = await _httpClient.GetFromJsonAsync<PrivateChatDto>(
                 $"api/messages/private/conversation/{conversationId}?pageSize={pageSize}&messageId={messageId}&loadOlder={loadOlder}&loadBothDirections={loadBothDirections}");
-            return response ?? new List<MessageDto>();
+            return response ?? new PrivateChatDto();
         }
 
         public async Task<IEnumerable<MessageDto>> GetChannelMessagesAsync(long channelId, int pageNumber, int pageSize, long messageId, bool loadOlder)

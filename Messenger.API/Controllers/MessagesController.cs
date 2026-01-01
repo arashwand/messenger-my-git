@@ -158,6 +158,45 @@ namespace Messenger.API.Controllers
             }
         }
 
+
+        /// <summary>
+        /// ارسال پیام به لیست کاربران
+        /// </summary>
+        [HttpPost("send-private-message-all-portal")]
+        [Authorize(Roles = ConstRoles.Manager + "," + ConstRoles.Personel)]
+        public async Task<IActionResult> SendMessageToAllFromPortal([FromBody] SendPrivateMessageToAllFromPortalDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest("Invalid request data.");
+
+            if (string.IsNullOrWhiteSpace(request.MessageText))
+                return BadRequest("Message text cannot be empty.");
+
+            var userId = GetCurrentUserId();
+            if (userId <= 0) return Unauthorized();
+
+            try
+            {
+                var savedMessageDto = await _broadcastService.BroadcasPrivateMessagetAsync(userId, request);
+
+                if (savedMessageDto == null)
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Failed to save message.");
+
+                return Ok(new
+                {
+                    Message = savedMessageDto.MessageText,
+                    Data = savedMessageDto.TargetIdsCount,
+                    SuccessfulUserIds = savedMessageDto.SuccessfulUserIds
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while sending message to MessageType {MessageType}", request.MessageType);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+            }
+        }
+
+
         [HttpGet("{messageId}")]
         public async Task<ActionResult<MessageDto>> GetMessageById(long messageId)
         {
@@ -177,7 +216,7 @@ namespace Messenger.API.Controllers
         }
 
         [HttpGet("private/conversation/{conversationId}")]
-        public async Task<ActionResult<IEnumerable<MessageDto>>> GetPrivateMessagesByConversationId(long conversationId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
+        public async Task<ActionResult<PrivateChatDto>> GetPrivateMessagesByConversationId(long conversationId, [FromQuery] int pageSize = 50, [FromQuery] long messageId = 0, [FromQuery] bool loadOlder = false, [FromQuery] bool loadBothDirections = false)
         {
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();

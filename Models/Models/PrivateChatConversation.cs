@@ -17,5 +17,8 @@ namespace Messenger.Models.Models
         public virtual User User1 { get; set; }
 
         public virtual User User2 { get; set; }
+
+        public virtual ICollection<MessageRecipient> MessageRecipients { get; set; } = new List<MessageRecipient>();
+
     }
 }

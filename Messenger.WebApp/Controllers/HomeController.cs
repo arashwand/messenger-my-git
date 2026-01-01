@@ -247,11 +247,12 @@ namespace Messenger.WebApp.Controllers
 
                 if (groupType == ConstChat.PrivateType)
                 {
-                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize, messageId, loadOlder, loadBothDirections);
+                    var pvChat = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize, messageId, loadOlder, loadBothDirections);
+                    messages = pvChat.Messages;
                 }
                 else
                 {
-                   
+
                     messages = await _messageService.GetChatMessagesAsync(chatId, groupType, pageNumber, pageSize, messageId, loadOlder, loadBothDirections);
                 }
 
@@ -350,7 +351,7 @@ namespace Messenger.WebApp.Controllers
                             messages = privateChat.Messages;
                             chatKey = privateChat.ConversationId.ToString();
                             ViewData["otherUserId"] = ViewData["chatGroupId"] = chatId = privateChat.ConversationId;
-                           // ViewData["chatGroupId"] = privateChat.ConversationId;
+                            ViewData["isSystemChat"] = privateChat.IsSystemChat;
                         }
                         else
                         {
@@ -359,13 +360,17 @@ namespace Messenger.WebApp.Controllers
                     }
                     else
                     {
-                        messages = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize);
+                        var privateChat = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize);
+                        messages = privateChat.Messages;
+                        chatKey = privateChat.ConversationId.ToString();
+                        ViewData["otherUserId"] = ViewData["chatGroupId"] = chatId = privateChat.ConversationId;
+                        ViewData["isSystemChat"] = privateChat.IsSystemChat;
                     }
                     chatName = "Private Chat";
                 }
                 else
                 {
-                    
+
 
                     messages = await _messageService.GetChatMessagesAsync(
                         chatId,
@@ -428,12 +433,13 @@ namespace Messenger.WebApp.Controllers
                 IEnumerable<MessageDto> messages;
 
                 if (groupType == ConstChat.PrivateType)
-                {                    
-                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize, messageId, loadOlder: true);
+                {
+                    var pvChat = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize, messageId, loadOlder: true);
+                    messages = pvChat.Messages;
                 }
                 else
                 {
-                    
+
                     messages = await _messageService.GetChatMessagesAsync(
                         chatId, groupType, 1, pageSize, messageId, loadOlder: true, loadBothDirections: false);
                 }
@@ -476,7 +482,8 @@ namespace Messenger.WebApp.Controllers
                 IEnumerable<MessageDto> messages;
                 if (groupType == ConstChat.PrivateType)
                 {
-                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize, messageId, loadOlder: false);
+                    var pvChats = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, pageSize, messageId, loadOlder: false);
+                    messages = pvChats.Messages;
                 }
                 else
                 {
@@ -523,7 +530,8 @@ namespace Messenger.WebApp.Controllers
                 IEnumerable<MessageDto> messages;
                 if (groupType == ConstChat.PrivateType)
                 {
-                    messages = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, 25, targetMessageId, loadOlder: true, loadBothDirections: true);
+                    var pvChat = await _messageService.GetPrivateMessagesByConversationIdAsync(chatId, 25, targetMessageId, loadOlder: true, loadBothDirections: true);
+                    messages = pvChat.Messages;
                 }
                 else
                 {
