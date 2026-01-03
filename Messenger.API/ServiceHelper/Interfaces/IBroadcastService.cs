@@ -28,5 +28,15 @@ namespace Messenger.API.ServiceHelper.Interfaces
         /// <param name="isPinned"></param>
         /// <returns></returns>
         Task NotifyGroupAboutPinAsync(long userId, long messageId, bool isPinned);
+
+
+        /// <summary>
+        /// حذف یک پیام و اطلاع رسانی به اعضای گروه
+        /// </summary>
+        /// <param name="MessageId"></param>
+        /// <param name="userId"></param>
+        /// <param name="IsPortalMessage"></param>
+        /// <returns></returns>
+        Task<ActionMessageDto> DeleteAndNotifyAboutMessageAsync(long MessageId, long userId, bool IsPortalMessage);
     }
 }

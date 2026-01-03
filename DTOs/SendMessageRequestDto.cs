@@ -77,5 +77,6 @@ namespace Messenger.DTOs
         public int TargetIdsCount { get; set; }
 
         public List<long> SuccessfulUserIds { get; set; } = new List<long>(); // اضافه شده
+        public long MessageId { get; set; }
     }
 }

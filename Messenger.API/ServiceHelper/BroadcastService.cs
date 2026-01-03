@@ -3,6 +3,7 @@ using Messenger.API.ServiceHelper.Interfaces;
 using Messenger.DTOs;
 using Messenger.Models.Models;
 using Messenger.Services;
+using Messenger.Services.Classes;
 using Messenger.Services.Interfaces;
 using Messenger.Tools;
 using Microsoft.AspNetCore.SignalR;
@@ -145,6 +146,7 @@ namespace Messenger.API.ServiceHelper
                             return new BroadcastResultDto
                             {
                                 MessageText = $"No recipients found for {request.MessageType}",
+                                MessageId = savedMessageDto.MessageId,
                                 TargetIdsCount = 0
                             };
                         }
@@ -237,6 +239,7 @@ namespace Messenger.API.ServiceHelper
                             return new BroadcastResultDto
                             {
                                 MessageText = $"No recipients found for {request.MessageType}",
+                                MessageId = savedMessageDto.MessageId,
                                 TargetIdsCount = 0
                             };
                         }
@@ -296,6 +299,7 @@ namespace Messenger.API.ServiceHelper
                 return new BroadcastResultDto
                 {
                     MessageText = $"با موفقیت به تعداد  {targetIdsCount} گیرنده ارسال شد",
+                    MessageId = savedMessageDto.MessageId,
                     TargetIdsCount = targetIdsCount
                 };
             }
@@ -366,13 +370,14 @@ namespace Messenger.API.ServiceHelper
                     return new BroadcastResultDto
                     {
                         MessageText = $"No recipients found for {request.MessageType}",
+                        MessageId = savedMessageDto.MessageId,
                         TargetIdsCount = 0,
                         SuccessfulUserIds = new List<long>()
                     };
                 }
 
                 var successfulUserIds = new List<long>();
-               
+
 
                 // تقسیم به batchها
                 var batches = peopleTargetIds.Select((id, index) => new { Id = id, Index = index })
@@ -394,6 +399,7 @@ namespace Messenger.API.ServiceHelper
                 return new BroadcastResultDto
                 {
                     MessageText = $"با موفقیت به تعداد  {successfulUserIds.Count} گیرنده ارسال شد",
+                    MessageId = savedMessageDto.MessageId,
                     TargetIdsCount = successfulUserIds.Count,
                     SuccessfulUserIds = successfulUserIds
                 };
@@ -665,6 +671,7 @@ namespace Messenger.API.ServiceHelper
                 return new BroadcastResultDto
                 {
                     MessageText = $"Successfully sent message to {request.TargetType} {request.TargetId}",
+                    MessageId = savedMessageDto.MessageId,
                     TargetIdsCount = 1 // برای یک هدف
                 };
             }
@@ -804,5 +811,34 @@ namespace Messenger.API.ServiceHelper
             }
         }
 
+
+        /// <summary>
+        /// حذف یک پیام و اطلاع رسانی به اعضای گروه
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        public async Task<ActionMessageDto?> DeleteAndNotifyAboutMessageAsync(long MessageId, long userId, bool IsPortalMessage)
+        {
+            try
+            {
+                // ابتدا پیام را حذف کن
+                var resultHideMessage =await _messageService.HideMessageAsync(userId, MessageId, IsPortalMessage);
+
+                var signalRGroupKey = GenerateSignalRGroupKey.GenerateKey(resultHideMessage.ClassGroupId, resultHideMessage.GroupType);
+                
+
+                await _hubContext.Clients.Group(signalRGroupKey).SendAsync("UserDeleteMessage", MessageId, true);
+                return resultHideMessage;
+            }
+            catch (TimeLimitExceededException ex)
+            {
+                _logger.LogError(ex, "Error deleting message {MessageId} by user {UserId}", MessageId, userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error notifying group about message deletion for MessageId {MessageId}", MessageId);
+            }
+        }
     }
 }

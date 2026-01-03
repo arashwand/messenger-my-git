@@ -173,7 +173,8 @@ namespace Messenger.WebApp.Controllers
         }
 
         [HttpGet("searchUsers")]
-        [Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
+        [Authorize(Roles = $"{ConstRoles.Manager}")]
+        //[Authorize(Roles = $"{ConstRoles.Manager},{ConstRoles.Personel}")]
         public async Task<IActionResult> SearchUsers([FromQuery] string query, [FromQuery] string searchType = "name")
         {
             try

@@ -185,6 +185,7 @@ namespace Messenger.API.Controllers
                 return Ok(new
                 {
                     Message = savedMessageDto.MessageText,
+                    MessageId = savedMessageDto.MessageId,
                     Data = savedMessageDto.TargetIdsCount,
                     SuccessfulUserIds = savedMessageDto.SuccessfulUserIds
                 });
@@ -225,8 +226,6 @@ namespace Messenger.API.Controllers
         }
 
         
-
-
         /// <summary>
         /// دریافت پیامهای گروه یا کانال مشخص
         /// </summary>
@@ -342,41 +341,20 @@ namespace Messenger.API.Controllers
         }
 
         [HttpPost("hide")]
-        public async Task<IActionResult> HideMessage(DeleteMessageRequestDto deleteMessageRequestModel)
+        public async Task<IActionResult> HideMessage(long MessageId, bool IsPortalMessage)
         {
             var userId = GetCurrentUserId();
             if (userId <= 0) return Unauthorized();
 
             try
             {
-                var hiddenMessageDto = await _messageService.HideMessageAsync(deleteMessageRequestModel.MessageId, userId,
-               deleteMessageRequestModel.GroupId, deleteMessageRequestModel.GroupType, deleteMessageRequestModel.IsPortalMessage);
+                var hiddenMessageDto = await _broadcastService.DeleteAndNotifyAboutMessageAsync(MessageId, userId, IsPortalMessage);
 
                 if (hiddenMessageDto == null)
                 {
                     return NotFound("Message not found or action not permitted.");
                 }
 
-                //TODO: این قسمت باید به BroadCast  منتقل بشه
-                string? signalrGroup = null;
-                if (hiddenMessageDto.MessageType == (byte)EnumMessageType.Group)
-                {
-                    signalrGroup = ConstChat.ClassGroup + hiddenMessageDto.ClassGroupId;
-                }
-                else if (hiddenMessageDto.MessageType == (byte)EnumMessageType.Channel)
-                {
-                    signalrGroup = ConstChat.ChannelGroup + hiddenMessageDto.ClassGroupId;
-                }
-
-                if (!string.IsNullOrEmpty(signalrGroup))
-                {
-                    await _hubContext.Clients.Group(signalrGroup).SendAsync("UserDeleteMessage", hiddenMessageDto.MessageId, true);
-                    _logger.LogInformation("Broadcasted UserDeleteMessage for messageId {MessageId} to group {SignalRGroup}", hiddenMessageDto.MessageId, signalrGroup);
-                }
-                else
-                {
-                    _logger.LogWarning("HideMessage: Message {MessageId} was hidden, but no ClassGroupId or ChannelId found in DTO for SignalR group broadcast. Message might be private or context is missing.", deleteMessageRequestModel.MessageId);
-                }
 
                 return Ok(new { message = "Message hidden successfully.", messageId = hiddenMessageDto.MessageId });
             }

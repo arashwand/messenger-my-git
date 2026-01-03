@@ -65,7 +65,8 @@ namespace Messenger.Services.Interfaces
         Task<long?> MarkMessageAsReadAsync(long messageId, long userId, long targetId, string groupTpe);
         Task<IEnumerable<MessageReadDto>> GetMessageReadStatusAsync(long messageId);
         Task PinMessageAsync(long userId, long messageId, bool isPinned); // Context (channel/private/group) might be needed
-        Task<ActionMessageDto?> HideMessageAsync(long messageId, long userId, long groupId, string groupType, bool isPortalMessage);
+        Task<ActionMessageDto?> HideMessageAsync(long messageId, long userId, bool isPortalMessage);
+
 
         // Reporting & Saving
         Task<MessageFoulReportDto> ReportMessageAsync(long messageId, long reporterUserId, string reason);

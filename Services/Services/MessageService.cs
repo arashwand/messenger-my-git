@@ -1901,16 +1901,48 @@ namespace Messenger.Services.Services
 
 
         /// <summary>
+        /// حذف پیام توسط کاربر
+        /// اگر پیام از سمت پرتال ارسال شده باشد باید چت و نوع گروه از روی پیام بدست بیاید
         /// isHiding = Delete message
         /// </summary>
         /// <param name="messageId"></param>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<ActionMessageDto?> HideMessageAsync(long messageId, long userId, long groupId, string groupType, bool isPortalMessage)
+        public async Task<ActionMessageDto?> HideMessageAsync(long messageId, long userId, bool isPortalMessage)
         {
             _logger.LogInformation($"Hiding message {messageId} for user {userId}");
 
-            // Include related data needed for DTO conversion and group identification
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                throw new UnauthorizedAccessException("User not found.");
+
+            long groupId = 0;
+            string groupType = "";
+
+            // اگر پیام از سمت پرتال ارسال شده باشد باید چت و نوع گروه از روی پیام ��دست بیاید
+            if (isPortalMessage)
+            {
+                //ابتدا بررسی میکنیم نقش کاربر پرسنل یا مدیر باشد
+
+                if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
+                    throw new UnauthorizedAccessException("User not authorized to hide this message.");
+
+                try
+                {
+                    // سپس چت و نوع گروه را از روی پیام بدست میاوریم
+                    var chatid_chatType = await GetTargetIdAndGroupTypeByMessageIdAsync(messageId);
+
+                    //جایگذاری مقادیر
+                    groupId = chatid_chatType.targetId;
+                    groupType = chatid_chatType.groupType;
+                }
+                catch (Exception)
+                {
+                    //اگر پیام پیدا نشد یا چت و نوع گروه بدست نیامد خطا میدهیم
+                    throw new Exception("Message not found or unable to determine chat and group type.");
+                }
+            }
+
 
             byte messageType = GetMessageType(groupId, groupType);
 
@@ -1931,17 +1963,23 @@ namespace Messenger.Services.Services
                 return null;
             }
 
-            //has Access    
-            var hasAccess = HasAccessToMessage(userId, messageEntity);
+            //بررسی اینکه ایا کاربر مالک این پیام است یا خیر    
+            var hasAccess = messageEntity.SenderUserId == userId;
+            if (!hasAccess)
+            {
+                //اگر دسترسی نداشت ولی نقش پرسنل یا مدیر داشت بتواند  دسترسی داشته باشد               
+                if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
+                    throw new UnauthorizedAccessException("User not authorized to hide this message.");
+            }
 
             var timeLimit = TimeSpan.FromMinutes(_timeSettings.TimeToDeleteMessagesInMinutes); // زمان مجاز برای حذف پیام
 
-            //if (DateTime.UtcNow - messageEntity.MessageDateTime > timeLimit)
-            //    throw new Exception($"Delete time limit exceeded. You can only delete messages within {timeLimit} minutes.");
-
-            if (DateTime.UtcNow - messageEntity.MessageDateTime > timeLimit)
-                throw new TimeLimitExceededException(_timeSettings.TimeToDeleteMessagesInMinutes);
-
+            //اگر نقش کاربر مدیر یا پرسنل نباشد باید بررسی کنیم که آیا پیام در بازه زمانی مجاز برای حذف است یا خیر
+            if (user.RoleName != ConstRoles.Manager && user.RoleName != ConstRoles.Personel)
+            {
+                if (DateTime.UtcNow - messageEntity.MessageDateTime > timeLimit)
+                    throw new TimeLimitExceededException(_timeSettings.TimeToDeleteMessagesInMinutes);
+            }
 
             messageEntity.IsHidden = true;
             _context.Messages.Update(messageEntity);
@@ -1951,10 +1989,7 @@ namespace Messenger.Services.Services
             var chatType = messageEntity.MessageType;
             long classGroupID = messageEntity.OwnerId;
 
-            // Map to DTO - reusing GetMessageByIdAsync logic structure but on existing entity
-
-            var signalRGroupKey = GenerateSignalRGroupKey.GenerateKey(classGroupID, "");
-
+            //ارسال پیام حذف شده به کلاینت 
             return new ActionMessageDto
             {
                 MessageId = messageEntity.MessageId,
@@ -1965,6 +2000,7 @@ namespace Messenger.Services.Services
             };
 
         }
+
 
         //TODO برقرار بشه
         public async Task<MessageFoulReportDto> ReportMessageAsync(long messageId, long reporterUserId, string reason)
@@ -2170,29 +2206,24 @@ namespace Messenger.Services.Services
             return messageTypeByte;
         }
 
-
-
-        public async Task DeletePrivateMessageAsync(long senderUserId, long messageId)
+        // بر اساس ایدی پیام و اینکه پیام از سمت پرتال بوده، ایدی چت و نوع چت را بدست می اوریم
+        private async Task<(long targetId, string groupType)> GetTargetIdAndGroupTypeByMessageIdAsync(long messageId)
         {
-            _logger.LogInformation($"Deleting private message {messageId} for user {senderUserId}");
-            // Find MessageSaved entity by ID
             var messageEntity = await _context.Messages
-                 .Where(w => w.MessageId == messageId).FirstOrDefaultAsync();
-
-            if (messageEntity == null) throw new Exception("Message not found");
-
-            //has access
-            var hasAccess = HasAccessToMessage(senderUserId, messageEntity);
-
-
-            // Verify userId matches the owner
-            if (messageEntity.SenderUserId != senderUserId) throw new Exception("User not authorized to delete this message");
-            // Soft delete entity = isHidden = true
-            messageEntity.IsHidden = true;
-            _context.Messages.Update(messageEntity);
-            // Save changes
-            await _context.SaveChangesAsync();
+                .FirstOrDefaultAsync(m => m.MessageId == messageId && m.IsSystemMessage == true);
+            if (messageEntity == null)
+                throw new Exception("Message not found");
+            long targetId = messageEntity.OwnerId;
+            string groupType = messageEntity.MessageType switch
+            {
+                (byte)EnumMessageType.Group => ConstChat.ClassGroupType,
+                (byte)EnumMessageType.Channel => ConstChat.ChannelGroupType,
+                (byte)EnumMessageType.Private => ConstChat.PrivateType,
+                _ => throw new Exception("Unknown message type")
+            };
+            return (targetId, groupType);
         }
+
 
         // --- Edit Messages ---
 
